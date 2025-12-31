@@ -7,10 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependency directories
 node_modules
+
+# Builds and coverage
 dist
 dist-ssr
+coverage
+
+# Environment files
+.env
+.env.local
+.env.*.local
 *.local
+
+# Tooling caches
+.parcel-cache
+.turbo
+.vite
+pnpm-lock.yaml
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +37,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Misc
+Thumbs.db
