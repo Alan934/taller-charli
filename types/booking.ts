@@ -1,0 +1,111 @@
+import { AssetType } from '../types/enums';
+
+export const BookingStatus = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  DONE: 'DONE',
+  CANCELED: 'CANCELED',
+} as const;
+
+export type BookingStatus = typeof BookingStatus[keyof typeof BookingStatus];
+
+export interface PartCategory {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface VehicleTypeOption {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
+export interface VehicleBrandOption {
+  id: number;
+  name: string;
+}
+
+export interface Issue {
+  id: number;
+  kind: 'COMMON' | 'CUSTOM';
+  label: string;
+  durationMinutes?: number;
+  partCategory?: PartCategory | null;
+}
+
+export interface SlotResponse {
+  date: string; // YYYY-MM-DD
+  slots: string[]; // ISO timestamps
+}
+
+export interface CreateBookingPayload {
+  assetType: AssetType;
+  vehicle?: {
+    typeId: number;
+    brandId?: number;
+    brandOther?: string;
+    model: string;
+    year?: number;
+    vinOrPlate?: string;
+    notes?: string;
+  };
+  part?: {
+    partCategoryId: number;
+    description: string;
+  };
+  commonIssueIds: number[];
+  customIssues?: string[];
+  details?: string;
+  mediaUrl?: string;
+  scheduledAt: string; // ISO
+  durationMinutes?: number;
+}
+
+export interface BookingResponse {
+  id: number;
+  code: string;
+  status: BookingStatus;
+  scheduledAt: string;
+  durationMinutes: number;
+  mediaUrl?: string | null;
+  assetType?: AssetType;
+}
+
+export interface BookingItem {
+  id: number;
+  code: string;
+  status: BookingStatus;
+  assetType: AssetType;
+  scheduledAt: string;
+  durationMinutes: number;
+  mediaUrl?: string | null;
+  vehicle?: {
+    id?: number;
+    type: VehicleTypeOption;
+    brand?: VehicleBrandOption | null;
+    brandOther?: string | null;
+    model: string;
+    year?: number;
+    vinOrPlate?: string;
+    notes?: string;
+  };
+  part?: {
+    id?: number;
+    description: string;
+    category: PartCategory;
+  };
+  customer?: {
+    id: number;
+    email: string;
+    fullName?: string;
+  } | null;
+}
+
+export interface BookingSummary {
+  total: number;
+  byStatus: Record<BookingStatus, number>;
+  upcoming?: BookingItem | null;
+}

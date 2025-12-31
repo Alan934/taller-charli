@@ -1,8 +1,41 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
+  const { token, loading } = useAuth();
+  const isAuthenticated = Boolean(token);
+  const currentYear = new Date().getFullYear();
+  const location = { lat: -32.719419, lng: -68.584754 };
+  const mapSrc = `https://www.google.com/maps?q=${location.lat},${location.lng}&z=16&output=embed`;
+
+  const handleLoginClick = () => {
+    if (loading) return;
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/auth/register');
+    }
+  };
+
+  const handleClientClick = () => {
+    if (loading) return;
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/auth/login', { state: { from: '/dashboard' } });
+    }
+  };
+
+  const handleScheduleClick = () => {
+    if (loading) return;
+    if (isAuthenticated) {
+      navigate('/book/step1');
+    } else {
+      navigate('/auth/login', { state: { from: '/book/step1' } });
+    }
+  };
 
   return (
     <div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden font-display bg-background-light dark:bg-background-dark text-[#111518] dark:text-white">
@@ -19,10 +52,16 @@ const Landing: React.FC = () => {
             <a class="text-sm font-medium hover:text-primary transition-colors cursor-pointer" onClick={() => navigate('/')}>Inicio</a>
             <a class="text-sm font-medium hover:text-primary transition-colors cursor-pointer" href="#servicios">Servicios</a>
             <a class="text-sm font-medium hover:text-primary transition-colors cursor-pointer" href="#nosotros">Nosotros</a>
-            <a class="text-sm font-medium hover:text-primary transition-colors cursor-pointer" onClick={() => navigate('/dashboard')}>Soy Cliente</a>
+            <a class="text-sm font-medium hover:text-primary transition-colors cursor-pointer" onClick={handleClientClick}>Soy Cliente</a>
           </nav>
           <button 
-            onClick={() => navigate('/book/step1')}
+            onClick={handleLoginClick}
+            class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-5 border border-primary text-primary text-sm font-bold shadow-sm hover:bg-primary/10 transition-colors"
+          >
+            <span class="truncate">Ingresar</span>
+          </button>
+          <button 
+            onClick={handleScheduleClick}
             class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-6 bg-primary text-white text-sm font-bold shadow-md hover:bg-blue-600 transition-colors"
           >
             <span class="truncate">Agendar Turno</span>
@@ -53,7 +92,7 @@ const Landing: React.FC = () => {
             </div>
             <div class="flex flex-col sm:flex-row justify-center gap-4 pt-4">
               <button 
-                onClick={() => navigate('/book/step1')}
+                onClick={handleScheduleClick}
                 class="flex h-12 items-center justify-center rounded-full bg-primary px-8 text-base font-bold text-white shadow-lg hover:bg-blue-600 transition-transform hover:scale-105"
               >
                 Solicitar Turno
@@ -111,7 +150,7 @@ const Landing: React.FC = () => {
                 <div>
                   <h3 class="font-bold text-xl mb-2">Alternadores y Arranques</h3>
                   <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4">
-                    Reparación y mantenimiento experto de burros de arranque y alternadores. Stock permanente de repuestos para una solución rápida.
+                    Reparación y mantenimiento experto de burros de arranque y alternadores.
                   </p>
                   <ul class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                     {['Bobinado', 'Cambio de carbones', 'Pruebas de banco'].map((li, k) => (
@@ -128,7 +167,7 @@ const Landing: React.FC = () => {
                 <div>
                   <h3 class="font-bold text-xl mb-2">Diagnóstico Computarizado</h3>
                   <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4">
-                    Utilizamos tecnología de punta para identificar fallas electrónicas con precisión, ahorrando tiempo y dinero en reparaciones innecesarias.
+                    Utilizamos tecnología avanzada para identificar fallas electrónicas con precisión, ahorrando tiempo y dinero en reparaciones innecesarias.
                   </p>
                   <ul class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                      {['Escaneo completo', 'Borrado de fallas', 'Chequeo de sensores'].map((li, k) => (
@@ -144,7 +183,7 @@ const Landing: React.FC = () => {
                   </div>
                   <div>
                     <h4 class="font-bold">Baterías</h4>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Control de carga y ventas.</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Control de carga y descarga.</p>
                   </div>
                 </div>
 
@@ -222,7 +261,7 @@ const Landing: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-lg">Dirección</h3>
-                                    <p class="text-gray-600 dark:text-gray-400">Av. San Martín 1234, Taller N° 5<br/>Ciudad, Provincia</p>
+                                    <p class="text-gray-600 dark:text-gray-400">Barrio Malvinas Argentinas<br/>Lavalle, Mendoza</p>
                                 </div>
                             </div>
                              <div class="flex gap-4">
@@ -231,7 +270,7 @@ const Landing: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-lg">Horario de Atención</h3>
-                                    <p class="text-gray-600 dark:text-gray-400">Lunes a Viernes: 08:00 - 18:00 hs<br/>Sábados: 08:00 - 13:00 hs</p>
+                                    <p class="text-gray-600 dark:text-gray-400">Lunes a Viernes: 08:00 - 13:00 hs y 16:00 - 20:00 hs<br/>Sábado: 08:00 - 13:00 hs<br/></p>
                                 </div>
                             </div>
                             <div class="flex gap-4">
@@ -240,21 +279,22 @@ const Landing: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-lg">Teléfono</h3>
-                                    <p class="text-gray-600 dark:text-gray-400 text-lg font-medium hover:text-primary cursor-pointer">+54 9 11 1234-5678</p>
+                                    <p class="text-gray-600 dark:text-gray-400 text-lg font-medium hover:text-primary cursor-pointer">+54 9 2613 14-3292</p>
                                     <p class="text-sm text-gray-500 mt-1">Atendemos WhatsApp</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                      {/* Map */}
-                    <div class="flex-1 min-h-[300px] md:min-h-auto relative bg-gray-200">
-                         <div class="absolute inset-0 bg-cover bg-center grayscale hover:grayscale-0 transition-all duration-500" style={{backgroundImage: 'url("https://placeholder.pics/svg/300")'}}>
-                             <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                  <div class="bg-white/90 dark:bg-black/80 backdrop-blur text-xs font-bold px-3 py-1 rounded shadow-lg border border-gray-200">
-                                        MAPA INTERACTIVO
-                                  </div>
-                             </div>
-                         </div>
+                    <div class="flex-1 min-h-[300px] md:min-h-auto relative bg-gray-200 rounded-xl overflow-hidden border border-gray-300 dark:border-gray-700 shadow-md">
+                      <iframe
+                        title="Ubicación de Taller Charli"
+                        src={mapSrc}
+                        loading="lazy"
+                        allowFullScreen
+                        referrerPolicy="no-referrer-when-downgrade"
+                        class="absolute inset-0 h-full w-full border-0"
+                      />
                     </div>
                 </div>
             </div>
@@ -273,7 +313,7 @@ const Landing: React.FC = () => {
             <a class="hover:text-primary" href="#">Política de Privacidad</a>
           </div>
           <div class="text-sm text-gray-400">
-            © 2023 Taller Charli. Todos los derechos reservados.
+            © {currentYear} Taller Charli. Todos los derechos reservados.
           </div>
         </div>
       </footer>
