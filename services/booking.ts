@@ -11,6 +11,7 @@ import {
   VehicleBrandOption,
   VehicleTypeOption,
 } from '../types/booking';
+import { CustomerSummary, CustomerVehicle } from '../types/booking';
 
 export const bookingApi = {
   listCommonIssues: (token: string, params?: { partCategoryId?: number }) => {
@@ -20,6 +21,8 @@ export const bookingApi = {
   listPartCategories: (token: string) => request<PartCategory[]>('/part-categories', { token }),
   listVehicleTypes: (token: string) => request<VehicleTypeOption[]>('/vehicle-types', { token }),
   listVehicleBrands: (token: string) => request<VehicleBrandOption[]>('/vehicle-brands', { token }),
+    searchCustomers: (query: string, token: string) => request<CustomerSummary[]>(`/bookings/customers/search?q=${encodeURIComponent(query)}`, { token }),
+    listCustomerVehicles: (customerId: number, token: string) => request<CustomerVehicle[]>(`/bookings/customers/${customerId}/vehicles`, { token }),
   getSlots: (
     params: { date: string; assetType: AssetType; durationMinutes?: number },
     token?: string,

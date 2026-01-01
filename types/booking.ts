@@ -28,6 +28,23 @@ export interface VehicleBrandOption {
   name: string;
 }
 
+export interface CustomerSummary {
+  id: number;
+  email: string;
+  fullName?: string | null;
+}
+
+export interface CustomerVehicle {
+  id: number;
+  type: VehicleTypeOption;
+  brand?: VehicleBrandOption | null;
+  brandOther?: string | null;
+  model: string;
+  year?: number;
+  vinOrPlate?: string | null;
+  notes?: string | null;
+}
+
 export interface Issue {
   id: number;
   kind: 'COMMON' | 'CUSTOM';
@@ -43,6 +60,12 @@ export interface SlotResponse {
 
 export interface CreateBookingPayload {
   assetType: AssetType;
+  customerId?: number;
+  createCustomer?: {
+    email: string;
+    fullName?: string;
+  };
+  vehicleId?: number;
   vehicle?: {
     typeId: number;
     brandId?: number;

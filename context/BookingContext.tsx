@@ -17,8 +17,11 @@ interface PartInput extends NonNullable<CreateBookingPayload['part']> {}
 
 interface BookingState {
   assetType: AssetType;
+  customerId?: number;
+  createCustomer?: { email: string; fullName?: string };
   vehicle?: VehicleInput;
   part?: PartInput;
+  existingVehicleId?: number;
   commonIssueIds: number[];
   customIssues: string[];
   details?: string;
@@ -44,6 +47,9 @@ interface BookingContextValue extends BookingState {
   setAssetType: (type: AssetType) => void;
   setVehicle: (v?: VehicleInput) => void;
   setPart: (p?: PartInput) => void;
+  setCustomerId: (id?: number) => void;
+  setCreateCustomer: (data?: { email: string; fullName?: string }) => void;
+  setExistingVehicleId: (id?: number) => void;
   toggleCommonIssue: (id: number) => void;
   setCustomIssues: (list: string[]) => void;
   setDetails: (text?: string) => void;
@@ -102,12 +108,18 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIssues([]);
     setAvailability({});
     availabilityCache.current = {};
-    setState((s) => ({ ...s, assetType: type, commonIssueIds: [], customIssues: [] }));
+    setState((s) => ({ ...s, assetType: type, commonIssueIds: [], customIssues: [], existingVehicleId: undefined }));
   };
+  const setCustomerId = (id?: number) =>
+    setState((s) => ({ ...s, customerId: id, createCustomer: undefined, existingVehicleId: undefined }));
+  const setCreateCustomer = (data?: { email: string; fullName?: string }) =>
+    setState((s) => ({ ...s, createCustomer: data, customerId: undefined, existingVehicleId: undefined }));
   const setVehicle = (v?: VehicleInput) =>
-    setState((s) => ({ ...s, vehicle: v, part: undefined, commonIssueIds: [], customIssues: [] }));
+    setState((s) => ({ ...s, vehicle: v, part: undefined, commonIssueIds: [], customIssues: [], existingVehicleId: undefined }));
   const setPart = (p?: PartInput) =>
     setState((s) => ({ ...s, part: p, vehicle: undefined, commonIssueIds: [], customIssues: [] }));
+  const setExistingVehicleId = (id?: number) =>
+    setState((s) => ({ ...s, existingVehicleId: id, vehicle: undefined }));
   const toggleCommonIssue = (id: number) =>
     setState((s) => ({
       ...s,
@@ -245,16 +257,33 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!state.scheduledAt) throw new Error('Selecciona un horario');
     if (!state.commonIssueIds.length) throw new Error('Selecciona al menos una falla común');
 
+    const isAdmin = user.role === 'ADMIN';
+    let customerId = user.id;
+    let createCustomer: { email: string; fullName?: string } | undefined = undefined;
+
+    if (isAdmin) {
+      customerId = state.customerId ?? undefined;
+      createCustomer = state.createCustomer?.email
+        ? { email: state.createCustomer.email.trim(), fullName: state.createCustomer.fullName?.trim() || undefined }
+        : undefined;
+
+      if (!customerId && !createCustomer) {
+        throw new Error('Selecciona un cliente existente o crea uno nuevo');
+      }
+    }
+
     if (state.assetType === 'VEHICLE') {
-      if (!state.vehicle) throw new Error('Completa los datos del vehículo');
-      if (!state.vehicle.typeId) {
-        throw new Error('Selecciona el tipo de vehículo');
-      }
-      if (!state.vehicle.model) {
-        throw new Error('Modelo es obligatorio');
-      }
-      if (!state.vehicle.brandId && !state.vehicle.brandOther?.trim()) {
-        throw new Error('Selecciona una marca o especifica "Otros"');
+      if (!state.existingVehicleId) {
+        if (!state.vehicle) throw new Error('Completa los datos del vehículo');
+        if (!state.vehicle.typeId) {
+          throw new Error('Selecciona el tipo de vehículo');
+        }
+        if (!state.vehicle.model) {
+          throw new Error('Modelo es obligatorio');
+        }
+        if (!state.vehicle.brandId && !state.vehicle.brandOther?.trim()) {
+          throw new Error('Selecciona una marca o especifica "Otros"');
+        }
       }
     }
 
@@ -265,8 +294,10 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const payload: CreateBookingPayload = {
       assetType: state.assetType,
-      customerId: user?.id,
-      vehicle: state.assetType === 'VEHICLE' ? state.vehicle : undefined,
+      customerId,
+      createCustomer,
+      vehicleId: state.assetType === 'VEHICLE' ? state.existingVehicleId : undefined,
+      vehicle: state.assetType === 'VEHICLE' && !state.existingVehicleId ? state.vehicle : undefined,
       part: state.assetType === 'PART' ? state.part : undefined,
       commonIssueIds: state.commonIssueIds,
       customIssues: state.customIssues.length ? state.customIssues : undefined,
@@ -307,8 +338,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       loadingAvailability,
       lastBooking,
       setAssetType,
+      setCustomerId,
+      setCreateCustomer,
       setVehicle,
       setPart,
+      setExistingVehicleId,
       toggleCommonIssue,
       setCustomIssues,
       setDetails,
@@ -335,6 +369,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       loadingSlots,
       loadingAvailability,
       lastBooking,
+      setCustomerId,
+      setCreateCustomer,
+      setExistingVehicleId,
       loadIssues,
       loadPartCategories,
       loadVehicleTypes,
