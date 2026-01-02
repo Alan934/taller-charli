@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { bookingApi } from '../../services/booking';
-import { BookingItem, BookingStatus } from '../../types/booking';
+import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus } from '../../types/booking';
 import { useAuth } from '../../context/AuthContext';
 
 const steps = ['Programado', 'Confirmado', 'En progreso', 'Finalizado'];
@@ -17,10 +17,11 @@ const statusIndex: Record<BookingStatus, number> = {
 const RepairTracking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [booking, setBooking] = useState<BookingItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!id || !token) return;
@@ -36,6 +37,19 @@ const RepairTracking: React.FC = () => {
     if (!booking) return 0;
     return statusIndex[booking.status] ?? 0;
   }, [booking]);
+
+  const handleStatusChange = async (status: BookingStatus) => {
+    if (!booking || !token) return;
+    setUpdating(true);
+    try {
+      const updated = await bookingApi.updateStatus(booking.id, status, token);
+      setBooking((prev) => (prev ? { ...prev, status: updated.status } : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   if (!id) {
     return <p className="text-sm text-red-600">Falta el id del turno.</p>;
@@ -66,14 +80,27 @@ const RepairTracking: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 flex flex-col gap-6">
             <div className="rounded-xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-[#e5e7eb] dark:border-gray-700">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 dark:bg-blue-900/40 px-3 py-1 text-xs font-bold text-primary uppercase tracking-wide">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                   </span>
-                  {booking.status}
+                  {BOOKING_STATUS_LABELS[booking.status]}
                 </span>
+                {user?.role === 'ADMIN' && (
+                  <select
+                    className="rounded-md border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1 text-xs font-semibold"
+                    value={booking.status}
+                    disabled={updating}
+                    onChange={(e) => handleStatusChange(e.target.value as BookingStatus)}
+                  >
+                    {Object.values(BookingStatus).map((s) => (
+                      <option key={s} value={s}>{BOOKING_STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                )}
+                {updating && <span className="text-xs text-primary">Guardando…</span>}
                 <p className="text-sm text-[#617989] dark:text-gray-400">Programado para {new Date(booking.scheduledAt).toLocaleString()}</p>
               </div>
               <h3 className="text-[#111518] dark:text-white text-2xl font-bold leading-tight mb-2">{booking.assetType}</h3>

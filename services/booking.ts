@@ -4,6 +4,7 @@ import {
   BookingItem,
   BookingResponse,
   BookingSummary,
+  BookingStatus,
   CreateBookingPayload,
   Issue,
   PartCategory,
@@ -46,4 +47,6 @@ export const bookingApi = {
   listAll: (token: string) => request<BookingItem[]>('/bookings', { token }),
   summary: (token: string) => request<BookingSummary>('/bookings/summary', { token }),
   getOne: (id: number, token: string) => request<BookingItem>(`/bookings/${id}`, { token }),
+  updateStatus: (id: number, status: BookingStatus, token: string) =>
+    request<BookingItem>(`/bookings/${id}/status`, { method: 'PATCH', body: { status }, token }),
 };

@@ -10,6 +10,14 @@ export const BookingStatus = {
 
 export type BookingStatus = typeof BookingStatus[keyof typeof BookingStatus];
 
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  PENDING: 'Pendiente',
+  CONFIRMED: 'Confirmado',
+  IN_PROGRESS: 'En progreso',
+  DONE: 'Completado',
+  CANCELED: 'Cancelado',
+};
+
 export interface PartCategory {
   id: number;
   code: string;

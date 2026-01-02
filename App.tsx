@@ -8,6 +8,7 @@ import DashboardHome from './pages/dashboard/DashboardHome';
 import RepairTracking from './pages/dashboard/RepairTracking';
 import Budget from './pages/dashboard/Budget';
 import History from './pages/dashboard/History';
+import CalendarView from './pages/dashboard/CalendarView';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 
@@ -103,6 +104,7 @@ const App: React.FC = () => {
             <Route path="repair/:id" element={<RepairTracking />} />
             <Route path="budget/:id" element={<Budget />} />
             <Route path="history" element={<History />} />
+            <Route path="calendar" element={<CalendarView />} />
           </Route>
 
           {/* Redirects */}

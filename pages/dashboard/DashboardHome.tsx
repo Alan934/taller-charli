@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingApi } from '../../services/booking';
-import { BookingItem, BookingSummary, BookingStatus } from '../../types/booking';
+import { BOOKING_STATUS_LABELS, BookingItem, BookingSummary, BookingStatus } from '../../types/booking';
+import type { AssetType } from '../../types/enums';
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
@@ -12,7 +13,11 @@ const DashboardHome: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL' | BookingStatus>('ALL');
+  const [assetFilter, setAssetFilter] = useState<'ALL' | AssetType>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [query, setQuery] = useState('');
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -34,12 +39,32 @@ const DashboardHome: React.FC = () => {
     const q = query.trim().toLowerCase();
     return bookings.filter((b) => {
       const matchesStatus = statusFilter === 'ALL' ? true : b.status === statusFilter;
+      const matchesAsset = assetFilter === 'ALL' ? true : b.assetType === assetFilter;
+      const scheduledDate = new Date(b.scheduledAt);
+      const matchesDateFrom = dateFrom ? scheduledDate >= new Date(dateFrom) : true;
+      const matchesDateTo = dateTo ? scheduledDate <= new Date(dateTo) : true;
+
       const matchesQuery = !q
         ? true
-        : b.code.toLowerCase().includes(q) || b.customer?.email?.toLowerCase().includes(q) || b.assetType.toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
+        : [
+            b.code,
+            b.customer?.email,
+            b.customer?.fullName,
+            b.assetType,
+            b.vehicle?.brand?.name,
+            b.vehicle?.brandOther,
+            b.vehicle?.model,
+            b.vehicle?.vinOrPlate,
+            b.part?.description,
+            b.part?.category?.name,
+            new Date(b.scheduledAt).toLocaleDateString(),
+          ]
+            .filter(Boolean)
+            .some((field) => field!.toString().toLowerCase().includes(q));
+
+      return matchesStatus && matchesAsset && matchesDateFrom && matchesDateTo && matchesQuery;
     });
-  }, [bookings, query, statusFilter]);
+  }, [assetFilter, bookings, dateFrom, dateTo, query, statusFilter]);
 
   const byStatus = useMemo(() => {
     return Object.values(BookingStatus).reduce<Record<BookingStatus, number>>((acc, s) => {
@@ -58,6 +83,33 @@ const DashboardHome: React.FC = () => {
   const pendingBudgets = summary?.byStatus[BookingStatus.PENDING] ?? 0;
   const greeting = user?.fullName ? user.fullName.split(' ')[0] : 'cliente';
   const isAdmin = user?.role === 'ADMIN';
+
+  const upcomingBookings = useMemo(() => {
+    const now = Date.now();
+    const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+    const limit = now + fiveDaysMs;
+    return [...bookings]
+      .filter((b) => b.status === BookingStatus.PENDING)
+      .filter((b) => {
+        const ts = new Date(b.scheduledAt).getTime();
+        return ts >= now && ts <= limit;
+      })
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+      .slice(0, 5);
+  }, [bookings]);
+
+  const handleStatusChange = async (bookingId: number, status: BookingStatus) => {
+    if (!token) return;
+    setUpdatingId(bookingId);
+    try {
+      const updated = await bookingApi.updateStatus(bookingId, status, token);
+      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: updated.status } : b)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-8">
@@ -156,12 +208,12 @@ const DashboardHome: React.FC = () => {
                     <span className="material-symbols-outlined text-3xl">{activeBooking.assetType === 'VEHICLE' ? 'directions_car' : 'build'}</span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#111518] dark:text-white">Turno #{activeBooking.code.slice(0, 8)}</h3>
+                    <h3 className="text-lg font-bold text-[#111518] dark:text-white">{activeBooking.customer?.fullName || activeBooking.customer?.email || 'Cliente'}</h3>
                     <p className="text-[#617989] dark:text-gray-400 text-sm">{new Date(activeBooking.scheduledAt).toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-primary text-xs font-bold uppercase tracking-wide">{activeBooking.status}</span>
+                  <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-primary text-xs font-bold uppercase tracking-wide">{BOOKING_STATUS_LABELS[activeBooking.status]}</span>
                 </div>
               </div>
             </div>
@@ -180,9 +232,9 @@ const DashboardHome: React.FC = () => {
                 <div key={b.id} className="p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => navigate(`/dashboard/repair/${b.id}`)}>
                   <div className="bg-blue-100 dark:bg-blue-900/30 text-primary rounded-lg p-2 h-fit"><span className="material-symbols-outlined text-lg">event</span></div>
                   <div>
-                    <p className="text-sm font-bold text-[#111518] dark:text-white">Turno {b.code.slice(0, 8)}</p>
+                    <p className="text-sm font-bold text-[#111518] dark:text-white">{b.customer?.fullName || b.customer?.email || 'Cliente'}</p>
                     <p className="text-xs text-gray-500">{new Date(b.scheduledAt).toLocaleString()}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">Estado: {b.status}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Estado: {BOOKING_STATUS_LABELS[b.status]}</p>
                   </div>
                 </div>
               ))}
@@ -194,66 +246,192 @@ const DashboardHome: React.FC = () => {
         </div>
       </div>
 
-      {/* Admin bookings table */}
+      {/* Admin agenda & bookings table */}
       {isAdmin && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-[#dbe1e6] dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
-          <div className="flex flex-wrap gap-3 items-center justify-between">
-            <div>
-              <h2 className="text-[#111518] dark:text-white text-xl font-bold">Turnos</h2>
-              <p className="text-sm text-[#617989] dark:text-gray-400">Filtro por estado y búsqueda por código o email.</p>
+        <div className="bg-white dark:bg-surface-dark rounded-xl border border-[#dbe1e6] dark:border-gray-800 shadow-sm p-6 flex flex-col gap-6">
+          <div className="flex flex-wrap gap-3 items-start justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
+                <span className="material-symbols-outlined text-lg">event_available</span>
+                Agenda de turnos
+              </div>
+              <h2 className="text-[#111518] dark:text-white text-xl font-bold">Gestión rápida para administradores</h2>
+              <p className="text-sm text-[#617989] dark:text-gray-400">Busca por vehículo, pieza, cliente, fecha o código. Filtra por estado y tipo.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="rounded-lg border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/book/step1')}
+                className="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors shadow-md shadow-blue-500/20"
               >
-                <option value="ALL">Todos</option>
-                {Object.values(BookingStatus).map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <input
-                className="rounded-lg border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                placeholder="Buscar por código o email"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
+                <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                Crear turno
+              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/70">
-                  {['Fecha', 'Código', 'Cliente', 'Tipo', 'Estado', 'Duración', 'Acciones'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#617989] dark:text-gray-400">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#dbe1e6] dark:divide-gray-800">
-                {filtered.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-[#111518] dark:text-white whitespace-nowrap">{new Date(b.scheduledAt).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#111518] dark:text-white">{b.code.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{b.customer?.email ?? 'Cliente'}</td>
-                    <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{b.assetType}</td>
-                    <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-primary text-xs font-semibold">{b.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{Math.round(b.durationMinutes)} min</td>
-                    <td className="px-4 py-3 text-sm">
-                      <button className="text-primary hover:underline" onClick={() => navigate(`/dashboard/repair/${b.id}`)}>Ver</button>
-                    </td>
-                  </tr>
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold uppercase text-[#617989] dark:text-gray-400 tracking-wide flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">filter_alt</span>
+                Buscar
+              </span>
+              <input
+                className="w-full rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                placeholder="Cliente, vehículo, pieza, código o fecha"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold uppercase text-[#617989] dark:text-gray-400 tracking-wide">Estado</span>
+              <select
+                className="rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | BookingStatus)}
+              >
+                <option value="ALL">Todos</option>
+                {Object.values(BookingStatus).map((s) => (
+                  <option key={s} value={s}>{BOOKING_STATUS_LABELS[s]}</option>
                 ))}
-                {!filtered.length && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6 text-sm text-[#617989] dark:text-gray-400 text-center">{loading ? 'Cargando...' : 'Sin resultados con ese filtro.'}</td>
-                  </tr>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold uppercase text-[#617989] dark:text-gray-400 tracking-wide">Tipo</span>
+              <select
+                className="rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                value={assetFilter}
+                onChange={(e) => setAssetFilter(e.target.value as 'ALL' | AssetType)}
+              >
+                <option value="ALL">Todos</option>
+                <option value="VEHICLE">Vehículo</option>
+                <option value="PART">Repuesto</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400">Desde</span>
+                <input
+                  type="date"
+                  className="rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400">Hasta</span>
+                <input
+                  type="date"
+                  className="rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {[{ label: 'Pendientes', value: byStatus[BookingStatus.PENDING], tone: 'amber' },
+              { label: 'En curso', value: byStatus[BookingStatus.IN_PROGRESS], tone: 'blue' },
+              { label: 'Completados', value: byStatus[BookingStatus.DONE], tone: 'green' }].map((card) => {
+              const toneStyles: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
+                blue: { bg: 'bg-blue-50', text: 'text-blue-700', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-200' },
+                amber: { bg: 'bg-amber-50', text: 'text-amber-700', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-200' },
+                green: { bg: 'bg-green-50', text: 'text-green-700', darkBg: 'dark:bg-green-900/30', darkText: 'dark:text-green-200' },
+              };
+              const tone = toneStyles[card.tone];
+              return (
+                <div key={card.label} className={`p-4 rounded-lg border border-[#dbe1e6] dark:border-gray-800 flex items-center justify-between ${tone.bg} ${tone.darkBg}`}>
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wide ${tone.text} ${tone.darkText}`}>{card.label}</p>
+                    <p className="text-2xl font-black text-[#111518] dark:text-white">{card.value ?? 0}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-2xl text-primary">monitoring</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2">
+              <div className="overflow-x-auto rounded-lg border border-[#dbe1e6] dark:border-gray-800">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/70">
+                      {['Fecha', 'Código', 'Cliente', 'Detalle', 'Estado', 'Duración', 'Acciones'].map((h) => (
+                        <th key={h} className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#617989] dark:text-gray-400">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#dbe1e6] dark:divide-gray-800">
+                    {filtered.map((b) => (
+                      <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white whitespace-nowrap">{new Date(b.scheduledAt).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-[#111518] dark:text-white">{b.code.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{b.customer?.fullName || b.customer?.email || 'Cliente'}</td>
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">
+                          {b.assetType === 'VEHICLE'
+                            ? `${b.vehicle?.brand?.name || b.vehicle?.brandOther || 'Marca'} ${b.vehicle?.model || ''}`
+                            : b.part?.description || 'Repuesto'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <select
+                              className="rounded-md border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-gray-800 px-2 py-1 text-xs"
+                              value={b.status}
+                              disabled={updatingId === b.id}
+                              onChange={(e) => handleStatusChange(b.id, e.target.value as BookingStatus)}
+                            >
+                              {Object.values(BookingStatus).map((s) => (
+                                <option key={s} value={s}>{BOOKING_STATUS_LABELS[s]}</option>
+                              ))}
+                            </select>
+                            {updatingId === b.id && <span className="text-[11px] text-primary">Guardando…</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{Math.round(b.durationMinutes)} min</td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="flex gap-2">
+                            <button className="text-primary hover:underline" onClick={() => navigate(`/dashboard/repair/${b.id}`)}>Ver</button>
+                            <button className="text-[#617989] hover:underline" onClick={() => navigate(`/dashboard/repair/${b.id}#timeline`)}>Seguimiento</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {!filtered.length && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-6 text-sm text-[#617989] dark:text-gray-400 text-center">{loading ? 'Cargando...' : 'Sin resultados con ese filtro.'}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[#111518] dark:text-white font-bold">Próximos turnos</h3>
+                <span className="text-xs text-[#617989] dark:text-gray-400">{upcomingBookings.length} en agenda</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {upcomingBookings.map((b) => (
+                  <div
+                    key={b.id}
+                    onClick={() => navigate(`/dashboard/repair/${b.id}`)}
+                    className="border border-[#dbe1e6] dark:border-gray-800 rounded-lg p-3 hover:border-primary/40 cursor-pointer transition-colors bg-gray-50/50 dark:bg-gray-900/40"
+                  >
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold text-[#111518] dark:text-white">{new Date(b.scheduledAt).toLocaleString()}</span>
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary font-bold">{BOOKING_STATUS_LABELS[b.status]}</span>
+                    </div>
+                    <p className="text-xs text-[#617989] dark:text-gray-400 mt-1">{b.customer?.fullName || b.customer?.email || 'Cliente'} · {b.assetType === 'VEHICLE' ? 'Vehículo' : 'Repuesto'}</p>
+                    <p className="text-xs text-[#111518] dark:text-white line-clamp-1">{b.assetType === 'VEHICLE' ? `${b.vehicle?.brand?.name || b.vehicle?.brandOther || ''} ${b.vehicle?.model || ''}` : b.part?.description}</p>
+                  </div>
+                ))}
+                {!upcomingBookings.length && (
+                  <div className="border border-dashed border-[#dbe1e6] dark:border-gray-800 rounded-lg p-4 text-sm text-[#617989] dark:text-gray-400">No hay turnos próximos.</div>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

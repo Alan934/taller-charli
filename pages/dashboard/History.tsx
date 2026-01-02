@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingApi } from '../../services/booking';
-import { BookingItem, BookingStatus } from '../../types/booking';
+import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus } from '../../types/booking';
+import type { AssetType } from '../../types/enums';
 
 const History: React.FC = () => {
     const navigate = useNavigate();
@@ -10,6 +11,11 @@ const History: React.FC = () => {
     const [bookings, setBookings] = useState<BookingItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [query, setQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | BookingStatus>('ALL');
+    const [assetFilter, setAssetFilter] = useState<'ALL' | AssetType>('ALL');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     useEffect(() => {
         if (!token) return;
@@ -20,15 +26,32 @@ const History: React.FC = () => {
             .finally(() => setLoading(false));
     }, [token, user?.role]);
 
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return bookings.filter((b) => {
+            const matchesStatus = statusFilter === 'ALL' ? true : b.status === statusFilter;
+            const matchesAsset = assetFilter === 'ALL' ? true : b.assetType === assetFilter;
+            const scheduledDate = new Date(b.scheduledAt);
+            const matchesFrom = dateFrom ? scheduledDate >= new Date(dateFrom) : true;
+            const matchesTo = dateTo ? scheduledDate <= new Date(dateTo) : true;
+            const matchesQuery = !q
+                ? true
+                : [b.code, b.customer?.email, b.customer?.fullName, b.assetType, b.vehicle?.brand?.name, b.vehicle?.model, b.part?.description]
+                    .filter(Boolean)
+                    .some((field) => field!.toString().toLowerCase().includes(q));
+            return matchesStatus && matchesAsset && matchesFrom && matchesTo && matchesQuery;
+        });
+    }, [assetFilter, bookings, dateFrom, dateTo, query, statusFilter]);
+
     const totals = useMemo(() => {
-        return bookings.reduce(
+        return filtered.reduce(
             (acc, b) => {
                 acc[b.status] = (acc[b.status] ?? 0) + 1;
                 return acc;
             },
             {} as Record<string, number>,
         );
-    }, [bookings]);
+    }, [filtered]);
 
     return (
         <div className="w-full flex flex-col gap-6">
@@ -50,7 +73,7 @@ const History: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                    { label: 'Total turnos', value: bookings.length },
+                    { label: 'Total filtrado', value: filtered.length },
                     { label: 'Pendientes', value: totals[BookingStatus.PENDING] ?? 0 },
                     { label: 'Completados', value: totals[BookingStatus.DONE] ?? 0 },
                 ].map((stat, i) => (
@@ -61,9 +84,68 @@ const History: React.FC = () => {
                 ))}
             </div>
 
+            <div className="bg-white dark:bg-[#1A2632] rounded-xl border border-[#dbe1e6] dark:border-[#2A3B4C] shadow-sm p-4 flex flex-col gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Buscar</span>
+                        <input
+                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            placeholder="Cliente, código, vehículo o pieza"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Estado</span>
+                        <select
+                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | BookingStatus)}
+                        >
+                            <option value="ALL">Todos</option>
+                            {Object.values(BookingStatus).map((s) => (
+                                <option key={s} value={s}>{BOOKING_STATUS_LABELS[s]}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Tipo</span>
+                        <select
+                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            value={assetFilter}
+                            onChange={(e) => setAssetFilter(e.target.value as 'ALL' | AssetType)}
+                        >
+                            <option value="ALL">Todos</option>
+                            <option value="VEHICLE">Vehículo</option>
+                            <option value="PART">Repuesto</option>
+                        </select>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400 uppercase">Desde</span>
+                            <input
+                                type="date"
+                                className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                            <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400 uppercase">Hasta</span>
+                            <input
+                                type="date"
+                                className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                            />
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white dark:bg-[#1A2632] rounded-xl border border-[#dbe1e6] dark:border-[#2A3B4C] shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-[#dbe1e6] dark:border-[#2A3B4C] flex items-center justify-between">
-                    <p className="text-sm text-[#617989] dark:text-gray-400">{loading ? 'Cargando...' : `${bookings.length} resultados`}</p>
+                    <p className="text-sm text-[#617989] dark:text-gray-400">{loading ? 'Cargando...' : `${filtered.length} resultados`}</p>
                     {error && <p className="text-sm text-red-600">{error}</p>}
                 </div>
                 <div className="overflow-x-auto">
@@ -76,14 +158,14 @@ const History: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#dbe1e6] dark:divide-[#2A3B4C]">
-                            {bookings.map((row) => (
+                            {filtered.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-[#202E3C] transition-colors">
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200 font-medium whitespace-nowrap">{new Date(row.scheduledAt).toLocaleString()}</td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.assetType}</td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.code.slice(0, 8)}</td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">
                                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2 py-1 text-xs font-semibold">
-                                            {row.status}
+                                            {BOOKING_STATUS_LABELS[row.status]}
                                         </span>
                                     </td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">
