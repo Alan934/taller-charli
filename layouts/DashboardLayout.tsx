@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -6,6 +6,7 @@ const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -13,6 +14,62 @@ const DashboardLayout: React.FC = () => {
     logout();
     navigate('/auth/login');
   };
+
+  const closeMobile = () => setMobileOpen(false);
+
+  const goTo = (path: string) => {
+    navigate(path);
+    closeMobile();
+  };
+
+  const NavLinks = () => (
+    <nav className="flex flex-col gap-2">
+      <a
+        onClick={() => goTo('/dashboard')}
+        className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+      >
+        <span className={`material-symbols-outlined ${isActive('/dashboard') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>dashboard</span>
+        <p className="text-sm font-semibold leading-normal">Tablero</p>
+      </a>
+      <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
+        <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">directions_car</span>
+        <p className="text-sm font-medium leading-normal">Mis Vehículos</p>
+      </a>
+      <a
+        onClick={() => goTo('/dashboard/history')}
+        className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/history') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+      >
+        <span className={`material-symbols-outlined ${isActive('/dashboard/history') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>history</span>
+        <p className="text-sm font-medium leading-normal">Historial</p>
+      </a>
+      {user?.role === 'ADMIN' && (
+        <a
+          onClick={() => goTo('/dashboard/calendar')}
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/calendar') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+        >
+          <span className={`material-symbols-outlined ${isActive('/dashboard/calendar') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>calendar_month</span>
+          <p className="text-sm font-medium leading-normal">Calendario</p>
+        </a>
+      )}
+      {user?.role === 'ADMIN' && (
+        <a
+          onClick={() => goTo('/dashboard/clients')}
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/clients') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+        >
+          <span className={`material-symbols-outlined ${isActive('/dashboard/clients') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>group</span>
+          <p className="text-sm font-medium leading-normal">Clientes</p>
+        </a>
+      )}
+      <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
+        <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">description</span>
+        <p className="text-sm font-medium leading-normal">Presupuestos</p>
+      </a>
+      <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
+        <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">settings</span>
+        <p className="text-sm font-medium leading-normal">Configuración</p>
+      </a>
+    </nav>
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark font-display text-[#111518] dark:text-gray-100">
@@ -33,54 +90,7 @@ const DashboardLayout: React.FC = () => {
             </div>
             
             {/* Navigation Links */}
-            <nav className="flex flex-col gap-2">
-              <a 
-                onClick={() => navigate('/dashboard')}
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
-              >
-                <span className={`material-symbols-outlined ${isActive('/dashboard') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>dashboard</span>
-                <p className="text-sm font-semibold leading-normal">Tablero</p>
-              </a>
-              <a 
-                 className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">directions_car</span>
-                <p className="text-sm font-medium leading-normal">Mis Vehículos</p>
-              </a>
-              <a 
-                onClick={() => navigate('/dashboard/history')}
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/history') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
-              >
-                <span className={`material-symbols-outlined ${isActive('/dashboard/history') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>history</span>
-                <p className="text-sm font-medium leading-normal">Historial</p>
-              </a>
-              {user?.role === 'ADMIN' && (
-                <a 
-                  onClick={() => navigate('/dashboard/calendar')}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/calendar') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
-                >
-                  <span className={`material-symbols-outlined ${isActive('/dashboard/calendar') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>calendar_month</span>
-                  <p className="text-sm font-medium leading-normal">Calendario</p>
-                </a>
-              )}
-              {user?.role === 'ADMIN' && (
-                <a 
-                  onClick={() => navigate('/dashboard/clients')}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/clients') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
-                >
-                  <span className={`material-symbols-outlined ${isActive('/dashboard/clients') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>group</span>
-                  <p className="text-sm font-medium leading-normal">Clientes</p>
-                </a>
-              )}
-              <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
-                <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">description</span>
-                <p className="text-sm font-medium leading-normal">Presupuestos</p>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
-                <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">settings</span>
-                <p className="text-sm font-medium leading-normal">Configuración</p>
-              </a>
-            </nav>
+            <NavLinks />
           </div>
           
           <div className="flex flex-col gap-4">
@@ -103,10 +113,37 @@ const DashboardLayout: React.FC = () => {
               <span className="material-symbols-outlined text-primary">electric_bolt</span>
               <span className="font-bold text-lg text-[#111518] dark:text-white">Taller Charli</span>
            </div>
-           <button className="text-[#111518] dark:text-white">
+           <button className="text-[#111518] dark:text-white" onClick={() => setMobileOpen((v) => !v)} aria-label="Abrir menú">
               <span className="material-symbols-outlined">menu</span>
            </button>
         </div>
+
+        {mobileOpen && (
+          <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex">
+            <div className="w-72 bg-white dark:bg-surface-dark h-full shadow-xl border-r border-[#dbe1e6] dark:border-gray-800 p-6 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2" onClick={() => goTo('/')}>
+                  <span className="material-symbols-outlined text-primary">electric_bolt</span>
+                  <span className="font-bold text-lg text-[#111518] dark:text-white">Taller Charli</span>
+                </div>
+                <button className="text-[#617989] hover:text-primary" onClick={closeMobile} aria-label="Cerrar menú">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <NavLinks />
+              <div className="mt-6">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-[#dbe1e6] dark:border-gray-700 text-[#111518] dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                >
+                  <span className="material-symbols-outlined text-lg">logout</span>
+                  Cerrar Sesión
+                </button>
+              </div>
+            </div>
+            <div className="flex-1" onClick={closeMobile} />
+          </div>
+        )}
         
         <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 scroll-smooth">
            <Outlet />
