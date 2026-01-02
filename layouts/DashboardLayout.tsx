@@ -63,6 +63,15 @@ const DashboardLayout: React.FC = () => {
                   <p className="text-sm font-medium leading-normal">Calendario</p>
                 </a>
               )}
+              {user?.role === 'ADMIN' && (
+                <a 
+                  onClick={() => navigate('/dashboard/clients')}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/clients') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+                >
+                  <span className={`material-symbols-outlined ${isActive('/dashboard/clients') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>group</span>
+                  <p className="text-sm font-medium leading-normal">Clientes</p>
+                </a>
+              )}
               <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
                 <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">description</span>
                 <p className="text-sm font-medium leading-normal">Presupuestos</p>

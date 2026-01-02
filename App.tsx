@@ -9,6 +9,7 @@ import RepairTracking from './pages/dashboard/RepairTracking';
 import Budget from './pages/dashboard/Budget';
 import History from './pages/dashboard/History';
 import CalendarView from './pages/dashboard/CalendarView';
+import AdminClients from './pages/dashboard/AdminClients';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 
@@ -18,17 +19,14 @@ import BookingStep2 from './pages/booking/BookingStep2';
 import BookingStep4 from './pages/booking/BookingStep4';
 import BookingSuccess from './pages/booking/BookingSuccess';
 import { useAuth } from './context/AuthContext';
+import Loading from './components/Loading';
 
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { token, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Cargando...
-      </div>
-    );
+    return <Loading label="Preparando tu sesión" />;
   }
 
   if (!token) {
@@ -105,6 +103,7 @@ const App: React.FC = () => {
             <Route path="budget/:id" element={<Budget />} />
             <Route path="history" element={<History />} />
             <Route path="calendar" element={<CalendarView />} />
+            <Route path="clients" element={<AdminClients />} />
           </Route>
 
           {/* Redirects */}

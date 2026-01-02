@@ -8,6 +8,14 @@ import type { AssetType } from '../../types/enums';
 const dayNames = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
+const statusTone: Record<BookingStatus, string> = {
+  PENDING: 'bg-amber-400',
+  CONFIRMED: 'bg-blue-500',
+  IN_PROGRESS: 'bg-indigo-500',
+  DONE: 'bg-green-500',
+  CANCELED: 'bg-gray-400',
+};
+
 const CalendarView: React.FC = () => {
   const { token, user } = useAuth();
   const navigate = useNavigate();
@@ -149,6 +157,11 @@ const CalendarView: React.FC = () => {
             const isToday = day.dateStr === todayStr;
             const isSelected = day.dateStr === selectedDate;
             const hasBookings = (bookingsByDate[day.dateStr]?.length ?? 0) > 0;
+            const statuses = (bookingsByDate[day.dateStr] ?? []).reduce<Record<BookingStatus, number>>((acc, b) => {
+              acc[b.status] = (acc[b.status] ?? 0) + 1;
+              return acc;
+            }, {} as Record<BookingStatus, number>);
+            const statusKeys = Object.keys(statuses) as BookingStatus[];
             return (
               <button
                 key={day.dateStr}
@@ -160,7 +173,15 @@ const CalendarView: React.FC = () => {
                 } ${isToday ? 'ring-2 ring-primary/30' : ''}`}
               >
                 <span className="text-base font-bold">{day.label}</span>
-                <span className="text-[11px] text-[#617989] dark:text-gray-400">{hasBookings ? (bookingsByDate[day.dateStr]?.length ?? 0) + ' turnos' : ''}</span>
+                {hasBookings ? (
+                  <div className="flex items-center gap-1 mt-1">
+                    {statusKeys.map((s) => (
+                      <span key={s} className={`w-2 h-2 rounded-full ${statusTone[s]}`} title={`${BOOKING_STATUS_LABELS[s]}: ${statuses[s]} turno(s)`}></span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-[#617989] dark:text-gray-400">Sin turnos</span>
+                )}
               </button>
             );
           })}
