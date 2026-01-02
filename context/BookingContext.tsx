@@ -68,14 +68,18 @@ interface BookingContextValue extends BookingState {
 
 const BookingContext = createContext<BookingContextValue | undefined>(undefined);
 
+const BOOKING_DRAFT_KEY = 'taller-charli.booking.draft';
+
+const initialState: BookingState = {
+  assetType: 'VEHICLE',
+  commonIssueIds: [],
+  customIssues: [],
+  durationMinutes: undefined,
+};
+
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token, user } = useAuth();
-  const [state, setState] = useState<BookingState>({
-    assetType: 'VEHICLE',
-    commonIssueIds: [],
-    customIssues: [],
-    durationMinutes: undefined,
-  });
+  const [state, setState] = useState<BookingState>(initialState);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [partCategories, setPartCategories] = useState<PartCategory[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([]);
@@ -90,6 +94,53 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [lastBooking, setLastBooking] = useState<BookingResponse | undefined>(undefined);
+  const lastUserDraftKeyRef = useRef<string | null>(null);
+
+  const draftKey = user ? `${BOOKING_DRAFT_KEY}.${user.id}` : null;
+
+  // Hydrate draft when user changes (login) and clear on logout
+  useEffect(() => {
+    if (!user) {
+      if (lastUserDraftKeyRef.current) {
+        localStorage.removeItem(lastUserDraftKeyRef.current);
+      }
+      lastUserDraftKeyRef.current = null;
+      setState(initialState);
+      setIssues([]);
+      setPartCategories([]);
+      setSlots([]);
+      availabilityCache.current = {};
+      setAvailability({});
+      setLastBooking(undefined);
+      return;
+    }
+
+    lastUserDraftKeyRef.current = draftKey;
+
+    if (draftKey) {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as BookingState;
+          setState({ ...initialState, ...parsed });
+        } catch {
+          setState(initialState);
+        }
+      } else {
+        setState(initialState);
+      }
+    }
+  }, [user, draftKey]);
+
+  // Persist draft whenever state changes for the logged-in user
+  useEffect(() => {
+    if (!draftKey || !token) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(state));
+    } catch {
+      // ignore storage errors
+    }
+  }, [state, draftKey, token]);
 
   // Recalculate duration from selected common issues; if total is 0, keep it undefined
   useEffect(() => {
@@ -309,11 +360,17 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const res = await bookingApi.create(payload, token);
     setLastBooking({ ...res, assetType: state.assetType });
+    if (draftKey) {
+      localStorage.removeItem(draftKey);
+    }
     return res;
   };
 
   const clearBooking = () => {
-    setState({ assetType: 'VEHICLE', commonIssueIds: [], customIssues: [], durationMinutes: undefined });
+    if (draftKey) {
+      localStorage.removeItem(draftKey);
+    }
+    setState(initialState);
     setIssues([]);
     setSlots([]);
     setPartCategories([]);

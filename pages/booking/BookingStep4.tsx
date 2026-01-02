@@ -355,7 +355,7 @@ const BookingStep4: React.FC = () => {
               <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center font-semibold">✓</div>
               <div>
                 <p className="text-sm text-gray-500">Paso 3 de 3</p>
-                <p className="text-lg font-semibold text-gray-900">Revisión final</p>
+                <p className="text-lg font-semibold text-gray-900">Revisión final (Verificar los datos del turno si son correctos)</p>
               </div>
             </div>
 
