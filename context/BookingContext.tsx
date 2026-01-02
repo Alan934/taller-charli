@@ -18,7 +18,7 @@ interface PartInput extends NonNullable<CreateBookingPayload['part']> {}
 interface BookingState {
   assetType: AssetType;
   customerId?: number;
-  createCustomer?: { email: string; fullName?: string };
+  createCustomer?: { email: string; fullName?: string; phone?: string; password?: string };
   vehicle?: VehicleInput;
   part?: PartInput;
   existingVehicleId?: number;
@@ -48,7 +48,7 @@ interface BookingContextValue extends BookingState {
   setVehicle: (v?: VehicleInput) => void;
   setPart: (p?: PartInput) => void;
   setCustomerId: (id?: number) => void;
-  setCreateCustomer: (data?: { email: string; fullName?: string }) => void;
+  setCreateCustomer: (data?: { email: string; fullName?: string; phone?: string; password?: string }) => void;
   setExistingVehicleId: (id?: number) => void;
   toggleCommonIssue: (id: number) => void;
   setCustomIssues: (list: string[]) => void;
@@ -162,9 +162,20 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setState((s) => ({ ...s, assetType: type, commonIssueIds: [], customIssues: [], existingVehicleId: undefined }));
   };
   const setCustomerId = (id?: number) =>
-    setState((s) => ({ ...s, customerId: id, createCustomer: undefined, existingVehicleId: undefined }));
-  const setCreateCustomer = (data?: { email: string; fullName?: string }) =>
-    setState((s) => ({ ...s, createCustomer: data, customerId: undefined, existingVehicleId: undefined }));
+    setState((s) => ({
+      ...s,
+      customerId: id,
+      // only clear createCustomer when selecting an existing id; if clearing id, keep draft
+      createCustomer: id ? undefined : s.createCustomer,
+      existingVehicleId: id ? s.existingVehicleId : undefined,
+    }));
+  const setCreateCustomer = (data?: { email: string; fullName?: string; phone?: string; password?: string }) =>
+    setState((s) => ({
+      ...s,
+      createCustomer: data,
+      customerId: data ? undefined : s.customerId,
+      existingVehicleId: data ? undefined : s.existingVehicleId,
+    }));
   const setVehicle = (v?: VehicleInput) =>
     setState((s) => ({ ...s, vehicle: v, part: undefined, commonIssueIds: [], customIssues: [], existingVehicleId: undefined }));
   const setPart = (p?: PartInput) =>
@@ -309,12 +320,20 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const isAdmin = user.role === 'ADMIN';
     let customerId = user.id;
-    let createCustomer: { email: string; fullName?: string } | undefined = undefined;
+    let createCustomer:
+      | { email: string; fullName?: string; phone?: string; password?: string }
+      | undefined = undefined;
+    let existingVehicleId = state.existingVehicleId;
 
     if (isAdmin) {
       customerId = state.customerId ?? undefined;
       createCustomer = state.createCustomer?.email
-        ? { email: state.createCustomer.email.trim(), fullName: state.createCustomer.fullName?.trim() || undefined }
+        ? {
+            email: state.createCustomer.email.trim(),
+            fullName: state.createCustomer.fullName?.trim() || undefined,
+            phone: state.createCustomer.phone?.trim() || undefined,
+            password: state.createCustomer.password?.trim() || undefined,
+          }
         : undefined;
 
       if (!customerId && !createCustomer) {
@@ -322,8 +341,21 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
+    // Recuperar vehículo existente del cliente si está seleccionado usar existente y no se persistió el id
+    if (isAdmin && state.assetType === 'VEHICLE' && !state.vehicle && !existingVehicleId && customerId) {
+      try {
+        const vehicles = await bookingApi.listCustomerVehicles(customerId, token);
+        if (vehicles.length) {
+          existingVehicleId = vehicles[0].id;
+          setState((s) => ({ ...s, existingVehicleId }));
+        }
+      } catch {
+        console.warn('[booking] no se pudo rehidratar vehículos existentes');
+      }
+    }
+
     if (state.assetType === 'VEHICLE') {
-      if (!state.existingVehicleId) {
+      if (!existingVehicleId) {
         if (!state.vehicle) throw new Error('Completa los datos del vehículo');
         if (!state.vehicle.typeId) {
           throw new Error('Selecciona el tipo de vehículo');
@@ -346,7 +378,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       assetType: state.assetType,
       customerId,
       createCustomer,
-      vehicleId: state.assetType === 'VEHICLE' ? state.existingVehicleId : undefined,
+      vehicleId: state.assetType === 'VEHICLE' ? existingVehicleId : undefined,
       vehicle: state.assetType === 'VEHICLE' && !state.existingVehicleId ? state.vehicle : undefined,
       part: state.assetType === 'PART' ? state.part : undefined,
       commonIssueIds: state.commonIssueIds,
@@ -356,6 +388,17 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       scheduledAt: state.scheduledAt,
       durationMinutes: state.durationMinutes,
     };
+
+    // Diagnóstico rápido
+    console.log('[booking-submit]', {
+      assetType: state.assetType,
+      customerId,
+      hasCreateCustomer: !!createCustomer,
+      existingVehicleId,
+      hasVehicle: !!state.vehicle,
+      partCategory: state.part?.partCategoryId,
+      scheduledAt: state.scheduledAt,
+    });
 
     const res = await bookingApi.create(payload, token);
     setLastBooking({ ...res, assetType: state.assetType });

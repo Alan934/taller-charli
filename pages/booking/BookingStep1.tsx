@@ -44,18 +44,17 @@ const BookingStep1: React.FC = () => {
   const [customerResults, setCustomerResults] = useState<CustomerSummary[]>([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
-  const [newCustomerForm, setNewCustomerForm] = useState({ email: '', fullName: '' });
+  const [newCustomerForm, setNewCustomerForm] = useState({ email: '', fullName: '', phone: '', password: '' });
+  const [pendingNewCustomer, setPendingNewCustomer] = useState<typeof newCustomerForm | null>(null);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [customerVehicles, setCustomerVehicles] = useState<CustomerVehicle[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
-  const [useExistingVehicle, setUseExistingVehicle] = useState(isAdmin);
+  const [useExistingVehicle, setUseExistingVehicle] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (lastBooking) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [lastBooking, navigate]);
+  // allow starting un nuevo turno incluso si existe un lastBooking previo (se limpia en Success)
 
   useEffect(() => {
     // sync mutually exclusive forms; avoid including setters in deps to prevent infinite loop
@@ -93,6 +92,26 @@ const BookingStep1: React.FC = () => {
       setVehicleForm((prev) => ({ ...prev, brandId: vehicleBrands[0].id }));
     }
   }, [vehicleBrands, vehicleForm.brandId, vehicleForm.brandOther]);
+
+  // If a customer is already selected and we have no vehicles loaded yet, fetch them so the existing vehicle id persists across navigation.
+  useEffect(() => {
+    if (isAdmin && selectedCustomer && !customerVehicles.length && !loadingVehicles) {
+      loadVehiclesForCustomer(selectedCustomer.id).catch(() => undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id]);
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      setUseExistingVehicle(true);
+    } else {
+      setUseExistingVehicle(false);
+      setExistingVehicleId(undefined);
+      setSelectedVehicleId(undefined);
+    }
+    // we intentionally ignore setters in deps to avoid re-runs on stable refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id]);
 
   const searchCustomers = async () => {
     if (!isAdmin || !token) return;
@@ -140,7 +159,8 @@ const BookingStep1: React.FC = () => {
     setSelectedCustomer(customer);
     setCustomerId(customer.id);
     setCreateCustomer(undefined);
-    setNewCustomerForm({ email: '', fullName: '' });
+    setPendingNewCustomer(null);
+    setNewCustomerForm({ email: '', fullName: '', phone: '', password: '' });
     setCustomerResults([]);
     loadVehiclesForCustomer(customer.id).catch(() => undefined);
   };
@@ -152,20 +172,61 @@ const BookingStep1: React.FC = () => {
     setCustomerVehicles([]);
     setUseExistingVehicle(false);
     setSelectedVehicleId(undefined);
+    setPendingNewCustomer(null);
+    setCreateCustomer(undefined);
+    setNewCustomerForm({ email: '', fullName: '', phone: '', password: '' });
+    setShowCustomerModal(false);
+    setModalError(null);
+  };
+
+  const openCustomerModal = () => {
+    setModalError(null);
+    setNewCustomerForm(pendingNewCustomer ?? { email: '', fullName: '', phone: '', password: '' });
+    setShowCustomerModal(true);
+  };
+
+  const confirmNewCustomer = () => {
+    setModalError(null);
+    const email = newCustomerForm.email.trim();
+    const password = newCustomerForm.password.trim();
+    const phone = newCustomerForm.phone.trim();
+    const fullName = newCustomerForm.fullName.trim();
+
+    if (!email || !password) {
+      setModalError('Completá email y contraseña.');
+      return;
+    }
+    if (password.length < 8) {
+      setModalError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (!phone) {
+      setModalError('Ingresá un teléfono de contacto.');
+      return;
+    }
+
+    const payload = { email, password, phone, fullName };
+    setPendingNewCustomer(payload);
+    setCreateCustomer(payload);
+    setCustomerId(undefined);
+    setSelectedCustomer(null);
+    setExistingVehicleId(undefined);
+    setCustomerVehicles([]);
+    setSelectedVehicleId(undefined);
+    setUseExistingVehicle(false);
+    setShowCustomerModal(false);
   };
 
   const handleContinue = () => {
     setError(null);
+    const newCustomerDraft = pendingNewCustomer && pendingNewCustomer.email ? pendingNewCustomer : null;
 
     if (isAdmin) {
       if (selectedCustomer) {
         setCustomerId(selectedCustomer.id);
-        setCreateCustomer(undefined);
-      } else if (newCustomerForm.email.trim()) {
-        setCreateCustomer({
-          email: newCustomerForm.email.trim(),
-          fullName: newCustomerForm.fullName.trim() || undefined,
-        });
+        setPendingNewCustomer(null);
+      } else if (newCustomerDraft) {
+        setCreateCustomer(newCustomerDraft);
         setCustomerId(undefined);
       } else {
         setError('Seleccioná un cliente existente o crea uno nuevo.');
@@ -179,12 +240,27 @@ const BookingStep1: React.FC = () => {
           setError('Seleccioná un cliente para poder elegir un vehículo.');
           return;
         }
-        if (!selectedVehicleId) {
+        const vehicleToUse = selectedVehicleId ?? (customerVehicles.length ? customerVehicles[0].id : undefined);
+        if (!vehicleToUse) {
           setError(customerVehicles.length ? 'Elegí un vehículo existente.' : 'El cliente no tiene vehículos cargados.');
           return;
         }
-        setExistingVehicleId(selectedVehicleId);
-        setVehicle(undefined);
+        setSelectedVehicleId(vehicleToUse);
+        setExistingVehicleId(vehicleToUse);
+        
+        // Populate vehicle state for UI summary in next steps
+        const selectedV = customerVehicles.find(v => v.id === vehicleToUse);
+        if (selectedV) {
+          setVehicle({
+            typeId: selectedV.type.id,
+            brandId: selectedV.brand?.id,
+            brandOther: selectedV.brandOther || undefined,
+            model: selectedV.model,
+            year: selectedV.year || undefined,
+          });
+        } else {
+          setVehicle(undefined);
+        }
       } else {
         if (!vehicleForm.typeId) {
           setError('Seleccioná el tipo de vehículo.');
@@ -256,11 +332,18 @@ const BookingStep1: React.FC = () => {
                   <p className="text-sm font-bold text-[#111518] dark:text-white">Cliente</p>
                   <p className="text-xs text-[#617989] dark:text-slate-400">Busca un cliente existente o cargá uno nuevo.</p>
                 </div>
-                {selectedCustomer && (
-                  <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {selectedCustomer.fullName ?? selectedCustomer.email}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  {selectedCustomer && (
+                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary">
+                      {selectedCustomer.fullName ?? selectedCustomer.email}
+                    </span>
+                  )}
+                  {pendingNewCustomer && (
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700">
+                      Nuevo cliente listo
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -278,6 +361,13 @@ const BookingStep1: React.FC = () => {
                     disabled={searchingCustomers || !token}
                   >
                     {searchingCustomers ? 'Buscando...' : 'Buscar cliente'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCustomerModal}
+                    className="h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:border-primary hover:text-primary"
+                  >
+                    Nuevo cliente
                   </button>
                 </div>
 
@@ -302,47 +392,62 @@ const BookingStep1: React.FC = () => {
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-3 text-sm text-slate-600 dark:text-slate-300">
-                    {selectedCustomer ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold">Cliente seleccionado</span>
-                        <span>{selectedCustomer.fullName ?? 'Sin nombre'}</span>
-                        <span className="text-xs text-slate-500">{selectedCustomer.email}</span>
+                  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-3 text-sm text-slate-600 dark:text-slate-300 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Cliente seleccionado</span>
+                      {selectedCustomer && (
                         <button
                           type="button"
-                          className="self-start text-xs text-primary hover:underline mt-2"
+                          className="text-xs text-primary hover:underline"
                           onClick={resetNewCustomer}
                         >
-                          Cambiar / crear otro cliente
+                          Limpiar
                         </button>
+                      )}
+                    </div>
+                    {selectedCustomer ? (
+                      <div className="flex flex-col gap-1">
+                        <span>{selectedCustomer.fullName ?? 'Sin nombre'}</span>
+                        <span className="text-xs text-slate-500">{selectedCustomer.email}</span>
                       </div>
                     ) : (
-                      <span>Sin cliente seleccionado.</span>
+                      <span className="text-slate-500">Sin cliente seleccionado.</span>
                     )}
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm font-semibold text-[#111518] dark:text-white">Crear nuevo cliente</p>
-                    <input
-                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                      placeholder="Email"
-                      value={newCustomerForm.email}
-                      onChange={(e) => {
-                        if (selectedCustomer) resetNewCustomer();
-                        setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }));
-                      }}
-                    />
-                    <input
-                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                      placeholder="Nombre completo (opcional)"
-                      value={newCustomerForm.fullName}
-                      onChange={(e) => {
-                        if (selectedCustomer) resetNewCustomer();
-                        setNewCustomerForm((prev) => ({ ...prev, fullName: e.target.value }));
-                      }}
-                    />
-                    <p className="text-xs text-slate-500">Se creará como cliente y recibirá la confirmación del turno.</p>
+
+                  <div className="rounded-lg border border-dashed border-amber-200 dark:border-amber-600 p-3 text-sm text-slate-700 dark:text-slate-200 flex flex-col gap-2 bg-amber-50/60 dark:bg-amber-900/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="font-semibold">Nuevo cliente</span>
+                        <span className="text-xs text-amber-700 dark:text-amber-200">Se creará al confirmar el turno.</span>
+                      </div>
+                      {pendingNewCustomer && (
+                        <button type="button" className="text-xs text-primary hover:underline" onClick={openCustomerModal}>
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                    {pendingNewCustomer ? (
+                      <div className="flex flex-col gap-1 text-sm">
+                        <span className="font-semibold">{pendingNewCustomer.fullName || 'Sin nombre'}</span>
+                        <span className="text-slate-600 dark:text-slate-200">{pendingNewCustomer.email}</span>
+                        <span className="text-xs text-slate-500">Tel: {pendingNewCustomer.phone}</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 text-slate-600 dark:text-slate-300">
+                        <span>Carga los datos desde el modal para crear un cliente nuevo.</span>
+                        <button
+                          type="button"
+                          className="self-start text-sm font-semibold text-primary hover:underline"
+                          onClick={openCustomerModal}
+                        >
+                          Abrir formulario
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
+                <p className="text-xs text-slate-500">El cliente se creará al confirmar el turno; evitamos duplicados si algo falla en el resto del flujo.</p>
               </div>
             </div>
           )}
@@ -610,6 +715,97 @@ const BookingStep1: React.FC = () => {
           </div>
         </div>
       </div>
+
+        {showCustomerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-xl bg-white dark:bg-[#0f1720] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 relative">
+              <button
+                type="button"
+                className="absolute top-3 right-3 text-slate-500 hover:text-slate-800 dark:text-slate-400"
+                onClick={() => {
+                  setShowCustomerModal(false);
+                  setModalError(null);
+                }}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-primary uppercase tracking-wide">Nuevo cliente</p>
+                <h3 className="text-xl font-bold text-[#111518] dark:text-white">Datos de contacto</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Se creará al confirmar el turno. Usuario y contraseña serán los ingresados.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Nombre completo
+                  <input
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    placeholder="Ej: Juan Pérez"
+                    value={newCustomerForm.fullName}
+                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Correo
+                  <input
+                    type="email"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    placeholder="cliente@correo.com"
+                    value={newCustomerForm.email}
+                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Teléfono
+                  <input
+                    type="tel"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    placeholder="2612465784"
+                    value={newCustomerForm.phone}
+                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Contraseña
+                  <input
+                    type="password"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    placeholder="Mínimo 8 caracteres"
+                    value={newCustomerForm.password}
+                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, password: e.target.value }))}
+                    required
+                    minLength={8}
+                  />
+                </label>
+              </div>
+
+              {modalError && <p className="text-sm text-red-600 mt-3">{modalError}</p>}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  className="px-4 h-10 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    setShowCustomerModal(false);
+                    setModalError(null);
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="px-5 h-10 rounded-lg bg-primary text-white font-semibold shadow hover:bg-primary/90"
+                  onClick={confirmNewCustomer}
+                >
+                  Guardar datos
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

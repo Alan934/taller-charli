@@ -29,11 +29,7 @@ const BookingStep2: React.FC = () => {
   const [customInput, setCustomInput] = useState('');
   const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    if (lastBooking) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [lastBooking, navigate]);
+  // no redirigir automáticamente si existe lastBooking: dejamos que el flujo muestre Success
 
   const vehicleTypeName = useMemo(() => {
     if (!vehicle?.typeId) return undefined;

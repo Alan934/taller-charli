@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookingHeader } from '../../components/BookingHeader';
 import { useBooking } from '../../context/BookingContext';
@@ -19,6 +19,10 @@ const BookingStep4: React.FC = () => {
     setDuration,
     submitBooking,
     lastBooking,
+    customerId,
+    createCustomer,
+    existingVehicleId,
+    vehicle,
   } = useBooking();
   const timeZone = 'America/Argentina/Buenos_Aires';
   const getNowZoned = () => {
@@ -85,13 +89,19 @@ const BookingStep4: React.FC = () => {
   const [yearMonth, setYearMonth] = useState({ year: initialYear, monthIndex: initialMonth - 1 });
   const monthFloor = useMemo(() => ({ year: initialYear, monthIndex: initialMonth - 1 }), [initialYear, initialMonth]);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [redirectingToStep1, setRedirectingToStep1] = useState(false);
+  const redirectTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (lastBooking) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [lastBooking, navigate]);
+    return () => {
+      if (redirectTimer.current) {
+        clearTimeout(redirectTimer.current);
+      }
+    };
+  }, []);
+  const [submitting, setSubmitting] = useState(false);
+
+  // No redirigir automáticamente si hay lastBooking; el usuario debe ver la pantalla de éxito
 
   useEffect(() => {
     loadSlots(date, assetType, durationMinutes).catch(() => undefined);
@@ -142,12 +152,52 @@ const BookingStep4: React.FC = () => {
 
   const confirm = async () => {
     setLocalError(null);
+    setRedirectingToStep1(false);
+    if (redirectTimer.current) {
+      clearTimeout(redirectTimer.current);
+      redirectTimer.current = null;
+    }
+
+    // Paso 1: Cliente
+    if (!customerId && !createCustomer) {
+      console.log('[BookingStep4] Validation failed: Missing customer', { customerId, createCustomer });
+      setLocalError('Paso 1: Asigna o crea un cliente antes de confirmar.');
+      setRedirectingToStep1(true);
+      redirectTimer.current = setTimeout(() => navigate('/book/step1'), 1300);
+      return;
+    }
+
+    // Paso 1: Vehículo
+    if (assetType === 'VEHICLE' && !existingVehicleId && !vehicle) {
+      const hint = customerId ? 'No se encontró vehículo asignado para el cliente seleccionado.' : 'Selecciona un cliente para elegir vehículo.';
+      setLocalError(`Paso 1: Selecciona un vehículo existente o completa los datos del vehículo. ${hint}`);
+      setRedirectingToStep1(true);
+      redirectTimer.current = setTimeout(() => navigate('/book/step1'), 1300);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await submitBooking();
       navigate('/book/success');
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'No se pudo crear el turno');
+      const message = err instanceof Error ? err.message : 'No se pudo crear el turno';
+      const missingCustomer = message.toLowerCase().includes('selecciona un cliente existente o crea uno nuevo');
+      console.log('[booking-confirm-error]', {
+        message,
+        assetType,
+        customerId,
+        createCustomer: !!createCustomer,
+        existingVehicleId,
+        hasVehicle: !!vehicle,
+      });
+      if (missingCustomer) {
+        setLocalError('Paso 1: Falta asignar el cliente. Te llevamos al Paso 1 para completarlo.');
+        setRedirectingToStep1(true);
+        redirectTimer.current = setTimeout(() => navigate('/book/step1'), 1300);
+      } else {
+        setLocalError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -158,6 +208,24 @@ const BookingStep4: React.FC = () => {
       <BookingHeader title="Agenda tu cita" step={3} onBack={() => navigate('/dashboard')} />
 
       <main className="max-w-5xl mx-auto px-6 py-10">
+        {redirectingToStep1 && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
+            <span className="material-symbols-outlined mt-0.5">error</span>
+            <div>
+              <p className="font-semibold text-sm">Paso 1: Falta asignar cliente</p>
+              <p className="text-sm">Volvemos al Paso 1 para que completes o selecciones el cliente.</p>
+              <button
+                type="button"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                onClick={() => navigate('/book/step1')}
+              >
+                Ir ahora
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-[1fr,320px] gap-8">
           <section className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-8">
@@ -385,7 +453,11 @@ const BookingStep4: React.FC = () => {
               </div>
             </div>
 
-            {localError && <p className="mt-4 text-sm text-red-600">{localError}</p>}
+            {localError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
+                {localError}
+              </div>
+            )}
 
             <button
               className="w-full mt-6 h-12 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-colors shadow-sm"
