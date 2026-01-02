@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,6 +37,10 @@ const Landing: React.FC = () => {
     }
   };
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden font-display bg-background-light dark:bg-background-dark text-[#111518] dark:text-white">
       {/* Header */}
@@ -67,10 +71,42 @@ const Landing: React.FC = () => {
             <span class="truncate">Agendar Turno</span>
           </button>
         </div>
-        <button class="md:hidden flex items-center text-[#111518] dark:text-white">
+        <button
+          class="md:hidden flex items-center text-[#111518] dark:text-white"
+          aria-label="Abrir menú"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
           <span class="material-symbols-outlined">menu</span>
         </button>
       </header>
+
+      {/* Mobile menu */}
+      <div
+        class={`md:hidden px-4 pb-4 pt-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#101a22] transition-all ${
+          menuOpen ? 'max-h-[320px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
+      >
+        <nav class="flex flex-col gap-3 text-sm font-medium text-[#111518] dark:text-white">
+          <a class="hover:text-primary cursor-pointer" onClick={() => { navigate('/'); closeMenu(); }}>Inicio</a>
+          <a class="hover:text-primary cursor-pointer" href="#servicios" onClick={closeMenu}>Servicios</a>
+          <a class="hover:text-primary cursor-pointer" href="#nosotros" onClick={closeMenu}>Nosotros</a>
+          <a class="hover:text-primary cursor-pointer" onClick={() => { handleClientClick(); closeMenu(); }}>Soy Cliente</a>
+        </nav>
+        <div class="mt-4 flex flex-col gap-3">
+          <button 
+            onClick={() => { handleLoginClick(); closeMenu(); }}
+            class="flex w-full items-center justify-center rounded-full h-10 px-5 border border-primary text-primary text-sm font-bold shadow-sm hover:bg-primary/10 transition-colors"
+          >
+            Ingresar
+          </button>
+          <button 
+            onClick={() => { handleScheduleClick(); closeMenu(); }}
+            class="flex w-full items-center justify-center rounded-full h-10 px-6 bg-primary text-white text-sm font-bold shadow-md hover:bg-blue-600 transition-colors"
+          >
+            Agendar Turno
+          </button>
+        </div>
+      </div>
 
       <main class="flex-1">
         {/* Hero Section */}

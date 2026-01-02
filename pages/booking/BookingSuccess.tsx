@@ -20,9 +20,8 @@ const BookingSuccess: React.FC = () => {
       };
    }, [lastBooking]);
 
-   const restart = () => {
-      clearBooking();
-      navigate('/book');
+   const goDashboard = () => {
+      navigate('/dashboard');
    };
 
    return (
@@ -69,16 +68,16 @@ const BookingSuccess: React.FC = () => {
 
                <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button
-                     className="h-11 px-5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50"
-                     onClick={restart}
-                  >
-                     Crear nueva reserva
-                  </button>
-                  <button
                      className="h-11 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold shadow-sm"
                      onClick={() => navigate('/dashboard/history')}
                   >
                      Ver mis reservas
+                  </button>
+                  <button
+                     className="h-11 px-5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50"
+                     onClick={goDashboard}
+                  >
+                     Ir al dashboard
                   </button>
                </div>
             </div>

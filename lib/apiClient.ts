@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+const TOKEN_KEY = 'taller-charli.token';
 
 interface RequestOptions extends RequestInit {
   token?: string | null;
@@ -25,7 +26,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (!response.ok) {
     const message = Array.isArray(payload?.message)
       ? payload.message.join(', ')
-      : payload?.message ?? 'Unexpected error';
+      : payload?.message ?? 'Error inesperado';
+
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      window.location.assign('/login');
+      throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+    }
+
     throw new Error(message);
   }
 

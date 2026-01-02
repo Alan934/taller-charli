@@ -24,9 +24,16 @@ const BookingStep2: React.FC = () => {
     setDetails,
     mediaUrl,
     setMediaUrl,
+    lastBooking,
   } = useBooking();
   const [customInput, setCustomInput] = useState('');
   const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    if (lastBooking) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [lastBooking, navigate]);
 
   const vehicleTypeName = useMemo(() => {
     if (!vehicle?.typeId) return undefined;
@@ -136,6 +143,35 @@ const BookingStep2: React.FC = () => {
 
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined text-primary">add</span>
+                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas adicionales</h3>
+              </div>
+              <div className="flex gap-3">
+                <input
+                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  placeholder="Ej: Testigo ABS encendido"
+                />
+                <button
+                  onClick={addCustom}
+                  type="button"
+                  className="px-4 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90"
+                >
+                  Agregar
+                </button>
+              </div>
+              {customIssues.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {customIssues.map((c) => (
+                    <span key={c} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">{c}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-primary">edit_note</span>
                 <h3 className="text-lg font-bold text-[#111518] dark:text-white">Detalles Específicos</h3>
               </div>
@@ -163,35 +199,6 @@ const BookingStep2: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-primary">add</span>
-                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas adicionales</h3>
-              </div>
-              <div className="flex gap-3">
-                <input
-                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                  value={customInput}
-                  onChange={(e) => setCustomInput(e.target.value)}
-                  placeholder="Ej: Testigo ABS encendido"
-                />
-                <button
-                  onClick={addCustom}
-                  type="button"
-                  className="px-4 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90"
-                >
-                  Agregar
-                </button>
-              </div>
-              {customIssues.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {customIssues.map((c) => (
-                    <span key={c} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">{c}</span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -251,12 +258,7 @@ const BookingStep2: React.FC = () => {
                 <div className="mt-8 flex flex-col gap-3">
                   <button 
                     onClick={() => navigate('/book/step4')}
-                    disabled={!commonIssueIds.length}
-                    className={`flex w-full items-center justify-center rounded-lg h-12 px-6 text-base font-bold leading-normal shadow-md transition-all ${
-                      commonIssueIds.length
-                        ? 'bg-primary text-white hover:bg-primary-dark hover:shadow-lg'
-                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    }`}
+                    className="flex w-full items-center justify-center rounded-lg h-12 px-6 text-base font-bold leading-normal shadow-md transition-all bg-primary text-white hover:bg-primary-dark hover:shadow-lg"
                   >
                     <span className="truncate">Continuar a Horarios</span>
                     <span className="material-symbols-outlined ml-2 text-sm">arrow_forward</span>

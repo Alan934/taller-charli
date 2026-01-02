@@ -12,6 +12,7 @@ const BookingStep1: React.FC = () => {
   const isAdmin = user?.role === 'ADMIN';
   const {
     assetType,
+    lastBooking,
     setAssetType,
     setCustomerId,
     setCreateCustomer,
@@ -49,6 +50,12 @@ const BookingStep1: React.FC = () => {
   const [useExistingVehicle, setUseExistingVehicle] = useState(isAdmin);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lastBooking) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [lastBooking, navigate]);
 
   useEffect(() => {
     // sync mutually exclusive forms; avoid including setters in deps to prevent infinite loop

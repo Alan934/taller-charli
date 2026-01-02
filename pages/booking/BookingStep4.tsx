@@ -18,6 +18,7 @@ const BookingStep4: React.FC = () => {
     durationMinutes,
     setDuration,
     submitBooking,
+    lastBooking,
   } = useBooking();
   const timeZone = 'America/Argentina/Buenos_Aires';
   const getNowZoned = () => {
@@ -87,6 +88,12 @@ const BookingStep4: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (lastBooking) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [lastBooking, navigate]);
+
+  useEffect(() => {
     loadSlots(date, assetType, durationMinutes).catch(() => undefined);
   }, [date, assetType, durationMinutes, loadSlots]);
 
@@ -148,7 +155,7 @@ const BookingStep4: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <BookingHeader title="Agenda tu cita" step={3} onBack={() => navigate(-1)} />
+      <BookingHeader title="Agenda tu cita" step={3} onBack={() => navigate('/dashboard')} />
 
       <main className="max-w-5xl mx-auto px-6 py-10">
         <div className="grid lg:grid-cols-[1fr,320px] gap-8">
@@ -242,16 +249,16 @@ const BookingStep4: React.FC = () => {
                           setScheduledAt('');
                         }}
                         className={`relative h-16 rounded-xl border text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                            : disabled
-                            ? 'border-gray-200 bg-red-50 text-red-500 cursor-not-allowed'
-                            : isLow
-                            ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:shadow-sm'
-                            : isGood
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:shadow-sm'
-                            : 'border-gray-200 bg-white text-gray-900 hover:border-emerald-400 hover:shadow-sm'
-                        }`}
+                              isSelected
+                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                                : disabled
+                                ? 'border-gray-200 bg-red-50 text-red-500 cursor-not-allowed'
+                                : isLow
+                                ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:shadow-sm'
+                                : isGood
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:shadow-sm'
+                                : 'border-gray-200 bg-white text-gray-900 hover:border-emerald-400 hover:shadow-sm'
+                            }`}
                       >
                         <span className="text-base font-semibold">{day.label}</span>
                         {isLoading ? <span className="text-[10px] text-gray-400">...</span> : null}
@@ -274,7 +281,7 @@ const BookingStep4: React.FC = () => {
                     <span>Sin turnos</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full bg-emerald-100 border border-emerald-300"></span>
+                    <span className="h-3 w-3 rounded-full bg-blue-100 border border-blue-400"></span>
                     <span>Seleccionado</span>
                   </div>
                 </div>

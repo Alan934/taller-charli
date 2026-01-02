@@ -35,6 +35,14 @@ const Login: React.FC = () => {
           <p className="text-primary font-semibold text-sm">Taller Charli</p>
           <h1 className="text-2xl font-bold text-gray-900">Iniciar sesión</h1>
           <p className="text-gray-500 text-sm mt-1">Accede a tu panel y seguimiento de reparaciones</p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700 transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">home</span>
+            Ir a la página principal
+          </button>
         </div>
 
         {infoMessage && <p className="mb-4 text-sm text-amber-600 text-center">{infoMessage}</p>}

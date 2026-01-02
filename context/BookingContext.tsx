@@ -306,7 +306,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const submitBooking = async () => {
     if (!token || !user) throw new Error('Debes iniciar sesión para reservar');
     if (!state.scheduledAt) throw new Error('Selecciona un horario');
-    if (!state.commonIssueIds.length) throw new Error('Selecciona al menos una falla común');
 
     const isAdmin = user.role === 'ADMIN';
     let customerId = user.id;

@@ -34,6 +34,14 @@ const Register: React.FC = () => {
           <p className="text-primary font-semibold text-sm">Taller Charli</p>
           <h1 className="text-2xl font-bold text-gray-900">Crear cuenta</h1>
           <p className="text-gray-500 text-sm mt-1">Regístrate para hacer seguimiento de tus reparaciones</p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700 transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">home</span>
+            Ir a la página principal
+          </button>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
