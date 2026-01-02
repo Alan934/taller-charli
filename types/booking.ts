@@ -61,6 +61,24 @@ export interface Issue {
   partCategory?: PartCategory | null;
 }
 
+export interface Workday {
+  id?: number;
+  weekday: number; // 0-6
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  isActive: boolean;
+  maxBookings: number;
+}
+
+export interface WorkdayOverride {
+  id?: number;
+  date: string; // YYYY-MM-DD
+  maxBookings: number;
+}
+
+export type WorkdayInput = Pick<Workday, 'weekday' | 'startTime' | 'endTime' | 'isActive' | 'maxBookings'>;
+export type WorkdayOverrideInput = Pick<WorkdayOverride, 'date' | 'maxBookings'>;
+
 export interface SlotResponse {
   date: string; // YYYY-MM-DD
   slots: string[]; // ISO timestamps

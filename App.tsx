@@ -10,6 +10,7 @@ import Budget from './pages/dashboard/Budget';
 import History from './pages/dashboard/History';
 import CalendarView from './pages/dashboard/CalendarView';
 import AdminClients from './pages/dashboard/AdminClients';
+import AdminSettings from './pages/dashboard/AdminSettings';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 
@@ -104,6 +105,7 @@ const App: React.FC = () => {
             <Route path="history" element={<History />} />
             <Route path="calendar" element={<CalendarView />} />
             <Route path="clients" element={<AdminClients />} />
+            <Route path="admin" element={<AdminSettings />} />
           </Route>
 
           {/* Redirects */}
