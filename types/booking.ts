@@ -125,6 +125,12 @@ export interface BookingResponse {
   assetType?: AssetType;
 }
 
+export interface BookingUsedPart {
+  id: number;
+  name: string;
+  quantity: number;
+}
+
 export interface BookingItem {
   id: number;
   code: string;
@@ -133,6 +139,8 @@ export interface BookingItem {
   scheduledAt: string;
   durationMinutes: number;
   mediaUrl?: string | null;
+  details?: string | null;
+  usedParts?: BookingUsedPart[];
   vehicle?: {
     id?: number;
     type: VehicleTypeOption;
@@ -152,6 +160,7 @@ export interface BookingItem {
     id: number;
     email: string;
     fullName?: string;
+    phone?: string;
   } | null;
 }
 

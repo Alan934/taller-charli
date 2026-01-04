@@ -119,7 +119,7 @@ const BookingStep4: React.FC = () => {
   const selectedText = useMemo(() => {
     if (!scheduledAt) return 'Sin seleccionar';
     const d = new Date(scheduledAt);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   }, [scheduledAt]);
 
   const monthLabel = useMemo(() => {

@@ -81,4 +81,10 @@ export const bookingApi = {
   getOne: (id: number, token: string) => request<BookingItem>(`/bookings/${id}`, { token }),
   updateStatus: (id: number, status: BookingStatus, token: string) =>
     request<BookingItem>(`/bookings/${id}/status`, { method: 'PATCH', body: { status }, token }),
+  addUsedPart: (id: number, data: { name: string; quantity: number }, token: string) =>
+    request<any>(`/bookings/${id}/parts`, { method: 'POST', body: data, token }),
+  removeUsedPart: (id: number, partId: number, token: string) =>
+    request<any>(`/bookings/${id}/parts/${partId}`, { method: 'DELETE', token }),
+  updateDetails: (id: number, details: string, token: string) =>
+    request<BookingItem>(`/bookings/${id}/details`, { method: 'PATCH', body: { details }, token }),
 };

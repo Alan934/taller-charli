@@ -14,7 +14,7 @@ const BookingSuccess: React.FC = () => {
       return {
          code: lastBooking.code,
          date: dt ? dt.toLocaleDateString() : 'Sin fecha',
-         time: dt ? dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+         time: dt ? dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
          asset: lastBooking.assetType === 'VEHICLE' ? 'Vehículo' : 'Repuesto',
          duration: formatDurationLabel(lastBooking.durationMinutes),
       };

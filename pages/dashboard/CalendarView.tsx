@@ -224,7 +224,7 @@ const DayColumn: React.FC<{ title: string; items: BookingItem[]; onNavigate: Ret
           <div className="flex items-center justify-between text-sm">
             <div className="flex flex-col">
               <span className="font-semibold text-[#111518] dark:text-white">{b.customer?.fullName || b.customer?.email || 'Cliente'}</span>
-              <span className="text-[11px] text-[#617989] dark:text-gray-400">{new Date(b.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="text-[11px] text-[#617989] dark:text-gray-400">{new Date(b.scheduledAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
             </div>
             <span className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary font-bold">{BOOKING_STATUS_LABELS[b.status]}</span>
           </div>

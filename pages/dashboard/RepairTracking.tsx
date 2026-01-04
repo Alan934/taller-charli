@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { bookingApi } from '../../services/booking';
-import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus } from '../../types/booking';
+import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus, BookingUsedPart } from '../../types/booking';
 import { useAuth } from '../../context/AuthContext';
 
 const steps = ['Programado', 'Confirmado', 'En progreso', 'Finalizado'];
@@ -22,13 +22,26 @@ const RepairTracking: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  
+  // Parts state
+  const [newPartName, setNewPartName] = useState('');
+  const [newPartQty, setNewPartQty] = useState(1);
+  const [addingPart, setAddingPart] = useState(false);
+
+  // Details state
+  const [details, setDetails] = useState('');
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
 
   useEffect(() => {
     if (!id || !token) return;
     setLoading(true);
     bookingApi
       .getOne(Number(id), token)
-      .then(setBooking)
+      .then((b) => {
+        setBooking(b);
+        setDetails(b.details || '');
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el turno'))
       .finally(() => setLoading(false));
   }, [id, token]);
@@ -48,6 +61,46 @@ const RepairTracking: React.FC = () => {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleAddPart = async () => {
+    if (!booking || !token || !newPartName.trim()) return;
+    setAddingPart(true);
+    try {
+      const part = await bookingApi.addUsedPart(booking.id, { name: newPartName, quantity: newPartQty }, token);
+      setBooking((prev) => prev ? { ...prev, usedParts: [...(prev.usedParts || []), part] } : prev);
+      setNewPartName('');
+      setNewPartQty(1);
+    } catch (err) {
+      alert('Error al agregar repuesto');
+    } finally {
+      setAddingPart(false);
+    }
+  };
+
+  const handleRemovePart = async (partId: number) => {
+    if (!booking || !token) return;
+    if (!confirm('¿Eliminar repuesto?')) return;
+    try {
+      await bookingApi.removeUsedPart(booking.id, partId, token);
+      setBooking((prev) => prev ? { ...prev, usedParts: prev.usedParts?.filter(p => p.id !== partId) } : prev);
+    } catch (err) {
+      alert('Error al eliminar repuesto');
+    }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!booking || !token) return;
+    setSavingDetails(true);
+    try {
+      await bookingApi.updateDetails(booking.id, details, token);
+      setBooking((prev) => prev ? { ...prev, details } : prev);
+      setEditingDetails(false);
+    } catch (err) {
+      alert('Error al guardar detalles');
+    } finally {
+      setSavingDetails(false);
     }
   };
 
@@ -101,7 +154,7 @@ const RepairTracking: React.FC = () => {
                   </select>
                 )}
                 {updating && <span className="text-xs text-primary">Guardando…</span>}
-                <p className="text-sm text-[#617989] dark:text-gray-400">Programado para {new Date(booking.scheduledAt).toLocaleString()}</p>
+                <p className="text-sm text-[#617989] dark:text-gray-400">Programado para {new Date(booking.scheduledAt).toLocaleString('es-AR', { hour12: false })}</p>
               </div>
               <h3 className="text-[#111518] dark:text-white text-2xl font-bold leading-tight mb-2">{booking.assetType}</h3>
               {booking.vehicle && (
@@ -150,16 +203,125 @@ const RepairTracking: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Notas / Descripción */}
+            <div className="rounded-xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-[#e5e7eb] dark:border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Notas / Descripción</h3>
+                {user?.role === 'ADMIN' && !editingDetails && (
+                  <button onClick={() => setEditingDetails(true)} className="text-sm text-primary hover:underline">Editar</button>
+                )}
+              </div>
+              {editingDetails ? (
+                <div className="flex flex-col gap-2">
+                  <textarea
+                    className="w-full rounded-lg border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm"
+                    rows={4}
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                    placeholder="Agregar notas sobre la reparación..."
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingDetails(false);
+                        setDetails(booking.details || '');
+                      }}
+                      className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveDetails}
+                      disabled={savingDetails}
+                      className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {savingDetails ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-[#617989] dark:text-gray-300 whitespace-pre-wrap">
+                  {booking.details || 'Sin notas adicionales.'}
+                </p>
+              )}
+            </div>
+
+            {/* Repuestos Utilizados */}
+            <div className="rounded-xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-[#e5e7eb] dark:border-gray-700">
+              <h3 className="text-lg font-bold text-[#111518] dark:text-white mb-4">Repuestos Utilizados</h3>
+              <div className="flex flex-col gap-3">
+                {booking.usedParts?.map((part) => (
+                  <div key={part.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-primary font-bold rounded-full text-xs">
+                        {part.quantity}x
+                      </span>
+                      <span className="text-sm font-medium text-[#111518] dark:text-white">{part.name}</span>
+                    </div>
+                    {user?.role === 'ADMIN' && (
+                      <button
+                        onClick={() => handleRemovePart(part.id)}
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-md transition-colors"
+                        title="Eliminar repuesto"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {(!booking.usedParts || booking.usedParts.length === 0) && (
+                  <p className="text-sm text-[#617989] dark:text-gray-400 italic">No se han registrado repuestos.</p>
+                )}
+              </div>
+
+              {user?.role === 'ADMIN' && (
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <p className="text-xs font-semibold text-[#617989] dark:text-gray-400 mb-2 uppercase">Agregar Repuesto</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nombre del repuesto"
+                      className="flex-1 rounded-lg border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                      value={newPartName}
+                      onChange={(e) => setNewPartName(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-20 rounded-lg border border-[#dbe1e6] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                      value={newPartQty}
+                      onChange={(e) => setNewPartQty(Number(e.target.value))}
+                    />
+                    <button
+                      onClick={handleAddPart}
+                      disabled={addingPart || !newPartName.trim()}
+                      className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {addingPart ? '...' : '+'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-6">
             <div className="rounded-xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-[#e5e7eb] dark:border-gray-700">
-              <h3 className="text-[#111518] dark:text-white text-lg font-bold leading-tight mb-4">Detalles</h3>
+              <h3 className="text-[#111518] dark:text-white text-lg font-bold leading-tight mb-4">Detalles del Cliente</h3>
+              <div className="flex flex-col gap-3">
+                <DetailRow label="Nombre" value={booking.customer?.fullName || 'No registrado'} />
+                <DetailRow label="Email" value={booking.customer?.email || 'No registrado'} />
+                <DetailRow label="Teléfono" value={booking.customer?.phone || 'No registrado'} />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-[#e5e7eb] dark:border-gray-700">
+              <h3 className="text-[#111518] dark:text-white text-lg font-bold leading-tight mb-4">Info del Turno</h3>
               <div className="flex flex-col gap-3">
                 <DetailRow label="Código" value={booking.code} />
-                <DetailRow label="Fecha" value={new Date(booking.scheduledAt).toLocaleString()} />
+                <DetailRow label="Fecha" value={new Date(booking.scheduledAt).toLocaleString('es-AR', { hour12: false })} />
                 {booking.vehicle?.vinOrPlate && <DetailRow label="Patente / VIN" value={booking.vehicle.vinOrPlate} />}
-                {booking.customer?.email && <DetailRow label="Cliente" value={booking.customer.email} />}
               </div>
             </div>
           </div>
