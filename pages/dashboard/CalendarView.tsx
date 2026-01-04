@@ -69,7 +69,7 @@ const CalendarView: React.FC = () => {
     const afternoonList: BookingItem[] = [];
     sorted.forEach((b) => {
       const hour = new Date(b.scheduledAt).getHours();
-      if (hour < 12) morningList.push(b);
+      if (hour < 14) morningList.push(b);
       else afternoonList.push(b);
     });
     return { morning: morningList, afternoon: afternoonList };
@@ -100,6 +100,15 @@ const CalendarView: React.FC = () => {
             Volver al panel
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 text-sm text-[#617989] dark:text-gray-400 px-1">
+        {Object.entries(statusTone).map(([status, colorClass]) => (
+          <div key={status} className="flex items-center gap-2">
+            <span className={`w-3 h-3 rounded-full ${colorClass}`}></span>
+            <span>{BOOKING_STATUS_LABELS[status as BookingStatus]}</span>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white dark:bg-surface-dark rounded-xl border border-[#dbe1e6] dark:border-gray-800 p-4 shadow-sm flex flex-col gap-4">
