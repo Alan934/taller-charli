@@ -22,7 +22,10 @@ const DashboardHome: React.FC = () => {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    Promise.all([bookingApi.summary(token), user?.role === 'ADMIN' ? bookingApi.listAll(token) : bookingApi.listMine(token)])
+    const isAdmin = user?.role === 'ADMIN';
+    const listPromise = isAdmin ? bookingApi.listAll(token) : bookingApi.listMine(token);
+    
+    Promise.all([bookingApi.summary(token), listPromise])
       .then(([s, list]) => {
         setSummary(s);
         setBookings(list);
@@ -208,8 +211,24 @@ const DashboardHome: React.FC = () => {
                     <span className="material-symbols-outlined text-3xl">{activeBooking.assetType === 'VEHICLE' ? 'directions_car' : 'build'}</span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-[#111518] dark:text-white">{activeBooking.customer?.fullName || activeBooking.customer?.email || 'Cliente'}</h3>
-                    <p className="text-[#617989] dark:text-gray-400 text-sm">{new Date(activeBooking.scheduledAt).toLocaleString()}</p>
+                    <h3 className="text-lg font-bold text-[#111518] dark:text-white">
+                      {isAdmin 
+                        ? (activeBooking.customer?.fullName || activeBooking.customer?.email || 'Cliente')
+                        : (activeBooking.assetType === 'VEHICLE' 
+                            ? `${activeBooking.vehicle?.brand?.name || activeBooking.vehicle?.brandOther || 'Vehículo'} ${activeBooking.vehicle?.model}` 
+                            : activeBooking.part?.description || 'Repuesto')
+                      }
+                    </h3>
+                    <p className="text-[#617989] dark:text-gray-400 text-sm">
+                      {isAdmin && (
+                        <span className="block text-xs font-normal mb-1">
+                          {activeBooking.assetType === 'VEHICLE' 
+                            ? `${activeBooking.vehicle?.brand?.name || ''} ${activeBooking.vehicle?.model || ''}` 
+                            : activeBooking.part?.description}
+                        </span>
+                      )}
+                      {new Date(activeBooking.scheduledAt).toLocaleString()}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
@@ -232,7 +251,14 @@ const DashboardHome: React.FC = () => {
                 <div key={b.id} className="p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => navigate(`/dashboard/repair/${b.id}`)}>
                   <div className="bg-blue-100 dark:bg-blue-900/30 text-primary rounded-lg p-2 h-fit"><span className="material-symbols-outlined text-lg">event</span></div>
                   <div>
-                    <p className="text-sm font-bold text-[#111518] dark:text-white">{b.customer?.fullName || b.customer?.email || 'Cliente'}</p>
+                    <p className="text-sm font-bold text-[#111518] dark:text-white">
+                      {isAdmin 
+                        ? (b.customer?.fullName || b.customer?.email || 'Cliente')
+                        : (b.assetType === 'VEHICLE' 
+                            ? `${b.vehicle?.brand?.name || b.vehicle?.brandOther || 'Vehículo'} ${b.vehicle?.model}` 
+                            : b.part?.description || 'Repuesto')
+                      }
+                    </p>
                     <p className="text-xs text-gray-500">{new Date(b.scheduledAt).toLocaleString()}</p>
                     <p className="text-[10px] text-gray-400 mt-1">Estado: {BOOKING_STATUS_LABELS[b.status]}</p>
                   </div>

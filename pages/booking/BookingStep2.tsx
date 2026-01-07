@@ -100,7 +100,7 @@ const BookingStep2: React.FC = () => {
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-primary">build_circle</span>
-                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas Comunes</h3>
+                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas Comunes <span className="text-sm font-normal text-gray-500">(Opcional)</span></h3>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400 mb-4">
                 <span>Selecciona una o más opciones que describan tu situación.</span>
@@ -140,7 +140,7 @@ const BookingStep2: React.FC = () => {
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-primary">add</span>
-                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas adicionales</h3>
+                <h3 className="text-lg font-bold text-[#111518] dark:text-white">Fallas adicionales <span className="text-sm font-normal text-gray-500">(Opcional)</span></h3>
               </div>
               <div className="flex gap-3">
                 <input
