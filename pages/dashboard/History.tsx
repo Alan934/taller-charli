@@ -54,134 +54,233 @@ const History: React.FC = () => {
     }, [filtered]);
 
     return (
-        <div className="w-full flex flex-col gap-6">
-            <div className="flex flex-wrap justify-between gap-3 pt-4">
-                <div className="flex min-w-72 flex-col gap-2">
-                    <h1 className="text-[#111518] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Historial de Servicio</h1>
-                    <p className="text-[#617989] dark:text-gray-400 text-base font-normal leading-normal">Turnos y reparaciones registrados.</p>
+        <div className="max-w-[1200px] mx-auto px-4 py-8 space-y-8 animate-fade-in font-sans">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex flex-col gap-2">
+                     <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight">Historial de Servicio</h1>
+                     <p className="text-gray-500 dark:text-gray-400 font-medium">Gestión integral de turnos y reparaciones</p>
                 </div>
-                <div className="flex items-center">
-                    <button
-                        onClick={() => navigate('/book/step1')}
-                        className="flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                        Nuevo Turno
-                    </button>
-                </div>
+                <button
+                    onClick={() => navigate('/book/step1')}
+                    className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold h-12 px-6 rounded-xl shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all text-sm"
+                >
+                    <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                    Nuevo Turno
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                    { label: 'Total filtrado', value: filtered.length },
-                    { label: 'Pendientes', value: totals[BookingStatus.PENDING] ?? 0 },
-                    { label: 'Completados', value: totals[BookingStatus.DONE] ?? 0 },
-                ].map((stat, i) => (
-                    <div key={i} className="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-[#1A2632] border border-[#dbe1e6] dark:border-[#2A3B4C] shadow-sm">
-                        <p className="text-[#617989] dark:text-gray-400 text-sm font-medium uppercase tracking-wider">{stat.label}</p>
-                        <p className="text-[#111518] dark:text-white text-3xl font-bold leading-tight tracking-tight">{stat.value}</p>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-gray-100 dark:border-gray-800 group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10">
+                         <span className="material-symbols-outlined text-[80px]">list_alt</span>
                     </div>
-                ))}
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Total Registros</p>
+                    <p className="text-4xl font-black text-gray-900 dark:text-white group-hover:text-primary transition-colors">{filtered.length}</p>
+                </div>
+                
+                 <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-gray-100 dark:border-gray-800 group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10 text-blue-500">
+                         <span className="material-symbols-outlined text-[80px]">pending_actions</span>
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">En Proceso / Pendientes</p>
+                    <p className="text-4xl font-black text-blue-600 dark:text-blue-400">
+                        {(totals[BookingStatus.PENDING] ?? 0) + (totals[BookingStatus.IN_PROGRESS] ?? 0) + (totals[BookingStatus.CONFIRMED] ?? 0)}
+                    </p>
+                </div>
+
+                 <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-[#1a2632] p-6 shadow-sm border border-gray-100 dark:border-gray-800 group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10 text-green-500">
+                         <span className="material-symbols-outlined text-[80px]">check_circle</span>
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Completados</p>
+                    <p className="text-4xl font-black text-green-600 dark:text-green-400">{totals[BookingStatus.DONE] ?? 0}</p>
+                </div>
             </div>
 
-            <div className="bg-white dark:bg-[#1A2632] rounded-xl border border-[#dbe1e6] dark:border-[#2A3B4C] shadow-sm p-4 flex flex-col gap-3">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Buscar</span>
+            {/* Filters Section */}
+            <div className="bg-white dark:bg-[#1a2632] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5 md:p-6">
+                 <div className="flex items-center gap-2 mb-4 text-gray-400">
+                    <span className="material-symbols-outlined text-[20px]">filter_list</span>
+                    <span className="text-xs font-bold uppercase tracking-widest">Filtros de búsqueda</span>
+                 </div>
+                 
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="relative group">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
+                            <span className="material-symbols-outlined text-[20px]">search</span>
+                        </span>
                         <input
-                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                            placeholder="Cliente, código, vehículo o pieza"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                            placeholder="Buscar cliente, código..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Estado</span>
+                    </div>
+
+                    <div className="relative">
                         <select
-                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none cursor-pointer"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as 'ALL' | BookingStatus)}
                         >
-                            <option value="ALL">Todos</option>
+                            <option value="ALL">Todos los estados</option>
                             {Object.values(BookingStatus).map((s) => (
                                 <option key={s} value={s}>{BOOKING_STATUS_LABELS[s]}</option>
                             ))}
                         </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-[#617989] dark:text-gray-400 uppercase">Tipo</span>
+                        <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-500">
+                            <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                        </span>
+                    </div>
+
+                    <div className="relative">
                         <select
-                            className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none cursor-pointer"
                             value={assetFilter}
                             onChange={(e) => setAssetFilter(e.target.value as 'ALL' | AssetType)}
                         >
-                            <option value="ALL">Todos</option>
+                            <option value="ALL">Todos los tipos</option>
                             <option value="VEHICLE">Vehículo</option>
                             <option value="PART">Repuesto</option>
                         </select>
-                    </label>
+                        <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-500">
+                             <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                        </span>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
-                        <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400 uppercase">Desde</span>
-                            <input
-                                type="date"
-                                className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1">
-                            <span className="text-[11px] font-semibold text-[#617989] dark:text-gray-400 uppercase">Hasta</span>
-                            <input
-                                type="date"
-                                className="rounded-lg border border-[#dbe1e6] dark:border-[#2A3B4C] bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                            />
-                        </label>
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            title="Desde"
+                        />
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            title="Hasta"
+                        />
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-[#1A2632] rounded-xl border border-[#dbe1e6] dark:border-[#2A3B4C] shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-[#dbe1e6] dark:border-[#2A3B4C] flex items-center justify-between">
-                    <p className="text-sm text-[#617989] dark:text-gray-400">{loading ? 'Cargando...' : `${filtered.length} resultados`}</p>
-                    {error && <p className="text-sm text-red-600">{error}</p>}
+            {/* Results Section */}
+            <div className="bg-white dark:bg-[#1a2632] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden min-h-[400px]">
+                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/30">
+                    <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                        {loading 
+                            ? <span className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></span> Cargando registros...</span> 
+                            : `${filtered.length} Registros encontrados`
+                        }
+                    </p>
+                    {error && (
+                        <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">error</span>
+                            {error}
+                        </span>
+                    )}
                 </div>
+                
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50 dark:bg-[#202E3C] border-b border-[#dbe1e6] dark:border-[#2A3B4C]">
-                                {['Fecha', 'Tipo', 'Código', 'Estado', 'Acciones'].map((h, i) => (
-                                    <th key={i} className="p-4 text-xs font-bold text-[#617989] dark:text-gray-400 uppercase tracking-wider">{h}</th>
-                                ))}
+                            <tr className="border-b border-gray-100 dark:border-gray-700">
+                                <th className="p-4 pl-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha / Hora</th>
+                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Tipo / Código</th>
+                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Detalle</th>
+                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+                                <th className="p-4 pr-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acción</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#dbe1e6] dark:divide-[#2A3B4C]">
-                            {filtered.map((row) => (
-                                <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-[#202E3C] transition-colors">
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200 font-medium whitespace-nowrap">
-                                      {row.timeType && row.timeType !== 'SPECIFIC'
-                                        ? `${new Date(row.scheduledAt).toLocaleDateString()} (${row.timeType === 'MORNING' ? 'Mañana' : 'Tarde'})`
-                                        : new Date(row.scheduledAt).toLocaleString()}
-                                    </td>
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.assetType}</td>
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.code.slice(0, 8)}</td>
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200">
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2 py-1 text-xs font-semibold">
-                                            {BOOKING_STATUS_LABELS[row.status]}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200">
-                                        <button
-                                            className="text-primary hover:underline text-sm"
-                                            onClick={() => navigate(`/dashboard/repair/${row.id}`)}
-                                        >
-                                            Ver detalle
-                                        </button>
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                            {filtered.length > 0 ? (
+                                filtered.map((row) => (
+                                    <tr key={row.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer" onClick={() => navigate(`/dashboard/repair/${row.id}`)}>
+                                        <td className="p-4 pl-6">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-gray-900 dark:text-white text-sm">
+                                                    {new Date(row.scheduledAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                </span>
+                                                <span className="text-xs text-gray-500">
+                                                    {row.timeType && row.timeType !== 'SPECIFIC'
+                                                        ? (row.timeType === 'MORNING' ? 'Mañana (8-12hs)' : 'Tarde (14-18hs)')
+                                                        : new Date(row.scheduledAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`material-symbols-outlined text-[16px] ${row.assetType === 'VEHICULO' ? 'text-blue-500' : 'text-orange-500'}`}>
+                                                        {row.assetType === 'VEHICULO' ? 'directions_car' : 'settings'}
+                                                    </span>
+                                                    <span className="text-xs font-bold uppercase text-gray-500 tracking-wider">
+                                                        {row.assetType === 'VEHICULO' ? 'Vehículo' : 'Repuesto'}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-gray-400 font-mono mt-1">#{row.code.slice(0, 8)}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 max-w-xs">
+                                             <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">
+                                                    {row.assetType === 'VEHICULO' 
+                                                        ? `${row.vehicle?.brand?.name ?? row.vehicle?.brandOther ?? ''} ${row.vehicle?.model ?? ''}`.trim() || 'Vehículo sin datos'
+                                                        : row.part?.name ?? 'Repuesto general'}
+                                                </span>
+                                                {user?.role === 'ADMIN' && row.customer && (
+                                                     <span className="text-xs text-primary flex items-center gap-1 mt-0.5">
+                                                        <span className="material-symbols-outlined text-[12px]">person</span>
+                                                        {row.customer.fullName}
+                                                     </span>
+                                                )}
+                                             </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold capitalize border ${
+                                                row.status === 'DONE' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900/50' :
+                                                row.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50' :
+                                                row.status === 'CANCELED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900/50' :
+                                                'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                            }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                                     row.status === 'DONE' ? 'bg-green-500' :
+                                                     row.status === 'IN_PROGRESS' ? 'bg-blue-500 animate-pulse' :
+                                                     row.status === 'CANCELED' ? 'bg-red-500' :
+                                                     'bg-gray-500'
+                                                }`}></span>
+                                                {BOOKING_STATUS_LABELS[row.status]}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 pr-6 text-right">
+                                            <button
+                                                className="inline-flex items-center justify-center p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/dashboard/repair/${row.id}`);
+                                                }}
+                                                title="Ver detalle completo"
+                                            >
+                                                <span className="material-symbols-outlined">visibility</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="p-12 text-center">
+                                        <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
+                                            <span className="material-symbols-outlined text-[48px] opacity-20">search_off</span>
+                                            <p className="text-sm">No se encontraron turnos que coincidan con la búsqueda.</p>
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                 </div>

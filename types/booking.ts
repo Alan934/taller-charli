@@ -144,6 +144,7 @@ export interface BookingItem {
   durationMinutes: number;
   mediaUrl?: string | null;
   details?: string | null;
+  repairNotes?: string | null;
   usedParts?: BookingUsedPart[];
   vehicle?: {
     id?: number;
