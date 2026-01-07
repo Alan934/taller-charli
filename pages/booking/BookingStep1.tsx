@@ -4,6 +4,7 @@ import { BookingHeader } from '../../components/BookingHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { bookingApi } from '../../services/booking';
+import { usersApi } from '../../services/users';
 import { CustomerSummary, CustomerVehicle } from '../../types/booking';
 
 const BookingStep1: React.FC = () => {
@@ -53,6 +54,7 @@ const BookingStep1: React.FC = () => {
   const [useExistingVehicle, setUseExistingVehicle] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [isFastClient, setIsFastClient] = useState(false);
 
   // allow starting un nuevo turno incluso si existe un lastBooking previo (se limpia en Success)
 
@@ -180,17 +182,40 @@ const BookingStep1: React.FC = () => {
   };
 
   const openCustomerModal = () => {
+    setIsFastClient(false);
     setModalError(null);
     setNewCustomerForm(pendingNewCustomer ?? { email: '', fullName: '', phone: '', password: '' });
     setShowCustomerModal(true);
   };
 
-  const confirmNewCustomer = () => {
+  const confirmNewCustomer = async () => {
     setModalError(null);
     const email = newCustomerForm.email.trim();
     const password = newCustomerForm.password.trim();
     const phone = newCustomerForm.phone.trim();
     const fullName = newCustomerForm.fullName.trim();
+
+    if (isFastClient) {
+      if (!fullName || !phone) {
+        setModalError('Nombre y teléfono son obligatorios.');
+        return;
+      }
+      try {
+        if (!token) return;
+        const created = await usersApi.createFastClient({ fullName, phone }, token);
+        selectCustomer({
+          id: created.id,
+          email: created.email || null,
+          fullName: created.fullName || null,
+          phone: created.phone || null,
+        });
+        setShowCustomerModal(false);
+      } catch (err) {
+        console.error(err);
+        setModalError('No se pudo crear el cliente rápido.');
+      }
+      return;
+    }
 
     if (!email || !password) {
       setModalError('Completá email y contraseña.');
@@ -215,6 +240,12 @@ const BookingStep1: React.FC = () => {
     setSelectedVehicleId(undefined);
     setUseExistingVehicle(false);
     setShowCustomerModal(false);
+  };
+
+  const isSelectedCategoryOther = () => {
+    const c = partCategories.find((cat) => cat.id === partForm.partCategoryId);
+    if (!c) return false;
+    return c.code === 'OTHER' || ['otro', 'otros', 'other'].includes(c.name.toLowerCase());
   };
 
   const handleContinue = () => {
@@ -285,13 +316,27 @@ const BookingStep1: React.FC = () => {
         setError('Seleccioná la categoría de la pieza.');
         return;
       }
-      if (!partForm.description.trim()) {
-        setError('Describe brevemente la pieza y el problema.');
-        return;
+
+      const isOther = isSelectedCategoryOther();
+      const selectedCat = partCategories.find(c => c.id === partForm.partCategoryId);
+      
+      // If it's OTHER, user must provide a description.
+      // If NOT OTHER, we use the category name as description (or keep existing logic).
+      let finalDescription = partForm.description.trim();
+      
+      if (isOther) {
+        if (!finalDescription) {
+          setError('Ingresá el nombre de la pieza.');
+          return;
+        }
+      } else {
+        // Automatically set description to category name if hidden or empty
+        finalDescription = selectedCat?.name || '';
       }
+
       setPart({
         partCategoryId: partForm.partCategoryId,
-        description: partForm.description.trim(),
+        description: finalDescription,
       });
     }
     navigate('/book/step2');
@@ -674,7 +719,17 @@ const BookingStep1: React.FC = () => {
                   <select
                     className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
                     value={partForm.partCategoryId ?? ''}
-                    onChange={(e) => setPartForm((f) => ({ ...f, partCategoryId: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const cat = partCategories.find((c) => c.id === id);
+                      const isOther = cat?.code === 'OTHER' || ['otro', 'otros', 'other'].includes(cat?.name.toLowerCase() || '');
+                      
+                      setPartForm((f) => ({ 
+                        ...f, 
+                        partCategoryId: id,
+                        description: isOther ? f.description : (cat?.name || '') 
+                      }));
+                    }}
                     disabled={loadingPartCategories}
                   >
                     <option value="" disabled>
@@ -690,15 +745,19 @@ const BookingStep1: React.FC = () => {
                     <span className="text-xs text-red-500">No hay categorías disponibles. Consulta con un administrador.</span>
                   )}
                 </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Descripción
-                  <input
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    value={partForm.description}
-                    onChange={(e) => setPartForm((f) => ({ ...f, description: e.target.value }))}
-                    required
-                  />
-                </label>
+                
+                {isSelectedCategoryOther() && (
+                  <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Nombre de la pieza
+                    <input
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                      placeholder="Ej: Burro de arranque"
+                      value={partForm.description}
+                      onChange={(e) => setPartForm((f) => ({ ...f, description: e.target.value }))}
+                      required
+                    />
+                  </label>
+                )}
               </div>
             )}
           </div>
@@ -731,9 +790,26 @@ const BookingStep1: React.FC = () => {
               </button>
 
               <div className="mb-4">
-                <p className="text-xs font-semibold text-primary uppercase tracking-wide">Nuevo cliente</p>
-                <h3 className="text-xl font-bold text-[#111518] dark:text-white">Datos de contacto</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">Se creará al confirmar el turno. Usuario y contraseña serán los ingresados.</p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-semibold text-primary uppercase tracking-wide">Nuevo cliente</p>
+                    <h3 className="text-xl font-bold text-[#111518] dark:text-white">Datos de contacto</h3>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm select-none">
+                     <input 
+                       type="checkbox" 
+                       checked={isFastClient} 
+                       onChange={(e) => setIsFastClient(e.target.checked)} 
+                       className="rounded border-slate-300 text-primary focus:ring-primary"
+                     />
+                     <span className="text-slate-700 dark:text-slate-200 font-medium">Sin cuenta</span>
+                  </label>
+                </div>
+                {!isFastClient ? (
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Se creará al confirmar el turno. Usuario y contraseña serán los ingresados.</p>
+                ) : (
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Se creará inmediatamente con nombre y teléfono. No tendrá acceso a la plataforma.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -747,17 +823,6 @@ const BookingStep1: React.FC = () => {
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Correo
-                  <input
-                    type="email"
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="cliente@correo.com"
-                    value={newCustomerForm.email}
-                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   Teléfono
                   <input
                     type="tel"
@@ -765,6 +830,20 @@ const BookingStep1: React.FC = () => {
                     placeholder="2612465784"
                     value={newCustomerForm.phone}
                     onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    required
+                  />
+                </label>
+                
+                {!isFastClient && (
+                  <>
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Correo
+                  <input
+                    type="email"
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    placeholder="cliente@correo.com"
+                    value={newCustomerForm.email}
+                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
                     required
                   />
                 </label>
@@ -780,6 +859,8 @@ const BookingStep1: React.FC = () => {
                     minLength={8}
                   />
                 </label>
+                  </>
+                )}
               </div>
 
               {modalError && <p className="text-sm text-red-600 mt-3">{modalError}</p>}

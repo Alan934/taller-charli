@@ -9,6 +9,11 @@ interface UpsertClientPayload {
   password?: string;
 }
 
+interface CreateFastClientPayload {
+  fullName: string;
+  phone: string;
+}
+
 export const usersApi = {
   listClients: (token: string, query?: string) => {
     const search = query ? `?q=${encodeURIComponent(query)}` : '';
@@ -16,6 +21,8 @@ export const usersApi = {
   },
   createClient: (payload: UpsertClientPayload, token: string) =>
     request<UserProfile>('/users/clients', { method: 'POST', body: payload, token }),
+  createFastClient: (payload: CreateFastClientPayload, token: string) =>
+    request<UserProfile>('/users/fast-client', { method: 'POST', body: payload, token }),
   updateClient: (id: number, payload: UpsertClientPayload, token: string) =>
     request<UserProfile>(`/users/${id}`, { method: 'PATCH', body: payload, token }),
   deleteClient: (id: number, token: string) => request<{ success: boolean }>(`/users/${id}`, { method: 'DELETE', token }),

@@ -20,7 +20,7 @@ export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
 
 export interface PartCategory {
   id: number;
-  code: string;
+  code?: string;
   name: string;
 }
 
@@ -38,8 +38,9 @@ export interface VehicleBrandOption {
 
 export interface CustomerSummary {
   id: number;
-  email: string;
+  email?: string | null;
   fullName?: string | null;
+  phone?: string | null; // Added phone as well just in case, though not strictly needed for summary display currently
 }
 
 export interface CustomerVehicle {
