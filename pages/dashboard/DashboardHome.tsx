@@ -365,7 +365,11 @@ const DashboardHome: React.FC = () => {
                   <tbody className="divide-y divide-[#dbe1e6] dark:divide-gray-800">
                     {filtered.map((b) => (
                       <tr key={b.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white whitespace-nowrap">{new Date(b.scheduledAt).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-sm text-[#111518] dark:text-white whitespace-nowrap">
+                          {b.timeType && b.timeType !== 'SPECIFIC'
+                            ? `${new Date(b.scheduledAt).toLocaleDateString()} (${b.timeType === 'MORNING' ? 'Mañana' : 'Tarde'})`
+                            : new Date(b.scheduledAt).toLocaleString()}
+                        </td>
                         <td className="px-4 py-3 text-sm font-mono text-[#111518] dark:text-white">{b.code.slice(0, 8)}</td>
                         <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">{b.customer?.fullName || b.customer?.email || 'Cliente'}</td>
                         <td className="px-4 py-3 text-sm text-[#111518] dark:text-white">

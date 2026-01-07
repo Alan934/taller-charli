@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookingHeader } from '../../components/BookingHeader';
+import { BookingTimeType } from '../../types/enums';
 import { useBooking } from '../../context/BookingContext';
 import { formatDurationLabel } from '../../lib/formatDuration';
 
@@ -15,6 +16,8 @@ const BookingStep4: React.FC = () => {
     refreshAvailability,
     setScheduledAt,
     scheduledAt,
+    timeType,
+    setTimeType,
     durationMinutes,
     setDuration,
     submitBooking,
@@ -90,6 +93,7 @@ const BookingStep4: React.FC = () => {
   const monthFloor = useMemo(() => ({ year: initialYear, monthIndex: initialMonth - 1 }), [initialYear, initialMonth]);
   const [localError, setLocalError] = useState<string | null>(null);
   const [redirectingToStep1, setRedirectingToStep1] = useState(false);
+  const [tab, setTab] = useState<'SHIFT' | 'SPECIFIC'>('SHIFT');
   const redirectTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -354,72 +358,138 @@ const BookingStep4: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 mb-2 font-semibold text-gray-800">Selecciona turno</div>
-                {(() => {
-                  const morning = filteredSlots.filter((s) => getZonedParts(s).hh < 15);
-                  const afternoon = filteredSlots.filter((s) => getZonedParts(s).hh >= 15);
-                  const fmtRange = (slots: string[]) => {
-                    if (!slots.length) return '';
-                    const first = getZonedParts(slots[0]);
-                    const last = getZonedParts(slots[slots.length - 1]);
-                    const fmt = ({ hh, mm }: { hh: number; mm: number }) =>
-                      `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-                    return `${fmt(first)} - ${fmt(last)} hrs`;
-                  };
-                  return (
+                <div className="mt-6 mb-4">
+                  <div className="flex gap-6 border-b border-gray-100 mb-4">
+                    <button
+                      className={`pb-2 text-sm font-semibold transition-colors ${
+                        tab === 'SHIFT' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                      onClick={() => {
+                        setTab('SHIFT');
+                        setScheduledAt('');
+                        setTimeType(BookingTimeType.MORNING); // Reset/Default
+                      }}
+                    >
+                      Por Turno (Recomendado)
+                    </button>
+                    <button
+                      className={`pb-2 text-sm font-semibold transition-colors ${
+                        tab === 'SPECIFIC' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                      onClick={() => {
+                        setTab('SPECIFIC');
+                        setScheduledAt('');
+                        setTimeType(BookingTimeType.SPECIFIC);
+                      }}
+                    >
+                      Horario Exacto
+                    </button>
+                  </div>
+
+                  {tab === 'SHIFT' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
-                        disabled={!morning.length}
-                        className={`h-12 rounded-xl border text-sm font-semibold transition-colors ${
-                          morning.length
-                            ? 'border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50'
-                            : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        className={`h-16 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                          timeType === BookingTimeType.MORNING && scheduledAt
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-200 hover:bg-emerald-50/50'
                         }`}
                         onClick={() => {
-                          if (!morning.length) return;
-                          setScheduledAt(morning[0]);
+                          // Construct generic morning time (08:00)
+                          // Assuming -03:00 fixed
+                          const iso = new Date(`${date}T08:00:00-03:00`).toISOString();
+                          setScheduledAt(iso);
+                          setTimeType(BookingTimeType.MORNING);
                           setDuration(durationMinutes ?? undefined);
                         }}
                       >
-                        Mañana {fmtRange(morning)}
+                        <span className="font-bold text-base">Turno Mañana</span>
+                        <span className="text-xs opacity-75">8:00 - 13:00</span>
                       </button>
                       <button
-                        disabled={!afternoon.length}
-                        className={`h-12 rounded-xl border text-sm font-semibold transition-colors ${
-                          afternoon.length
-                            ? 'border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50'
-                            : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        className={`h-16 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                          timeType === BookingTimeType.AFTERNOON && scheduledAt
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-200 hover:bg-emerald-50/50'
                         }`}
                         onClick={() => {
-                          if (!afternoon.length) return;
-                          setScheduledAt(afternoon[0]);
+                          // Construct generic afternoon time (16:00)
+                          const iso = new Date(`${date}T16:00:00-03:00`).toISOString();
+                          setScheduledAt(iso);
+                          setTimeType(BookingTimeType.AFTERNOON);
                           setDuration(durationMinutes ?? undefined);
                         }}
                       >
-                        Tarde {fmtRange(afternoon)}
+                        <span className="font-bold text-base">Turno Tarde</span>
+                        <span className="text-xs opacity-75">16:00 - 20:00</span>
                       </button>
                     </div>
-                  );
-                })()}
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {filteredSlots.length === 0 ? (
+                        <div className="col-span-full text-center py-4 text-gray-400 text-sm">
+                          No hay horarios exactos disponibles para este día.
+                        </div>
+                      ) : (
+                        filteredSlots.map((slot) => {
+                          const { hh, mm } = getZonedParts(slot);
+                          const label = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                          const isSelected = scheduledAt === slot && timeType === BookingTimeType.SPECIFIC;
+                          
+                          return (
+                            <button
+                              key={slot}
+                              className={`py-2 px-1 rounded-lg border text-sm font-medium transition-all ${
+                                isSelected
+                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                                  : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:shadow-sm'
+                              }`}
+                              onClick={() => {
+                                setScheduledAt(slot);
+                                setTimeType(BookingTimeType.SPECIFIC);
+                                setDuration(durationMinutes ?? undefined);
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* End Selection Logic */}
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-50 via-white to-blue-50 rounded-2xl p-6 border border-emerald-100">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-emerald-500">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M4.5 18.75V7.5a2.25 2.25 0 012.25-2.25h10.5A2.25 2.25 0 0119.5 7.5v11.25m-15 0A2.25 2.25 0 006.75 21h10.5A2.25 2.25 0 0019.5 18.75m-15 0v-7.5A2.25 2.25 0 016.75 9h10.5a2.25 2.25 0 012.25 2.25v7.5m-12-3h.008v.008H7.5v-.008zm3 0h.008v.008H10.5v-.008zm3 0h.008v.008H13.5v-.008z" />
-                    </svg>
+              <div className="bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/50 rounded-2xl p-6 border border-emerald-100 shadow-sm">
+                <div className="flex items-start gap-4 mb-5">
+                  <div className="w-10 h-10 rounded-full bg-white flex flex-shrink-0 items-center justify-center shadow-sm border border-emerald-100">
+                    <span className="material-symbols-outlined text-emerald-500">campaign</span>
                   </div>
                   <div>
-                    <p className="text-sm text-emerald-600 font-semibold">Recordatorio</p>
-                    <p className="text-gray-700">Un asesor confirmará tu cita y preparará el taller para tu llegada.</p>
+                    <p className="text-sm font-bold text-emerald-800 uppercase tracking-wide mb-1">Recordatorio</p>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      Un asesor confirmará tu cita a la brevedad. Recibirás una notificación y un correo cuando tu turno esté confirmado.
+                    </p>
                   </div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
-                  <p className="text-sm text-gray-600 mb-1">Horario elegido</p>
-                  <p className="text-lg font-semibold text-gray-900">{selectedText}</p>
-                  <p className="text-sm text-gray-500">Duración estimada: {formatDurationLabel(durationMinutes)}</p>
-                  <p className="text-xs text-gray-400">Horas en zona: Mendoza, Argentina</p>
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Horario seleccionado</p>
+                    <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        {selectedText === 'Sin seleccionar' ? '--/--/--' : selectedText}
+                    </p>
+                  </div>
+                  <div className="flex gap-4 pt-2 border-t border-gray-50">
+                    <div>
+                        <p className="text-xs text-gray-400">Duración</p>
+                        <p className="font-semibold text-gray-700">{formatDurationLabel(durationMinutes)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-400">Zona Horaria</p>
+                        <p className="font-semibold text-gray-700">Mendoza (GMT-3)</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

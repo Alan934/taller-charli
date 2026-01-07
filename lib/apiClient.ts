@@ -29,9 +29,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       : payload?.message ?? 'Error inesperado';
 
     if (response.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      window.location.assign('/login');
-      throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+      // Don't global redirect if we are just trying to login
+      if (!path.includes('/auth/login')) {
+        localStorage.removeItem(TOKEN_KEY);
+        // Use hash-based navigation for HashRouter
+        window.location.hash = '/auth/login';
+        throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+      }
     }
 
     throw new Error(message);

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { bookingApi } from '../services/booking';
-import { AssetType } from '../types/enums';
+import { AssetType, BookingTimeType } from '../types/enums';
 import {
   BookingResponse,
   CreateBookingPayload,
@@ -28,6 +28,7 @@ interface BookingState {
   mediaUrl?: string;
   scheduledAt?: string;
   durationMinutes?: number;
+  timeType?: BookingTimeType;
 }
 
 interface BookingContextValue extends BookingState {
@@ -54,6 +55,7 @@ interface BookingContextValue extends BookingState {
   setCustomIssues: (list: string[]) => void;
   setDetails: (text?: string) => void;
   setMediaUrl: (url?: string) => void;
+  setTimeType: (type: BookingTimeType) => void;
   loadIssues: (partCategoryId?: number) => Promise<void>;
   loadPartCategories: () => Promise<void>;
   loadVehicleTypes: () => Promise<void>;
@@ -75,6 +77,7 @@ const initialState: BookingState = {
   commonIssueIds: [],
   customIssues: [],
   durationMinutes: undefined,
+  timeType: 'SPECIFIC',
 };
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -192,6 +195,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setCustomIssues = (list: string[]) => setState((s) => ({ ...s, customIssues: list }));
   const setDetails = (text?: string) => setState((s) => ({ ...s, details: text }));
   const setMediaUrl = (url?: string) => setState((s) => ({ ...s, mediaUrl: url }));
+  const setTimeType = (type: BookingTimeType) => setState((s) => ({ ...s, timeType: type }));
   const setScheduledAt = (iso: string) => setState((s) => ({ ...s, scheduledAt: iso }));
   const setDuration = (minutes?: number) => setState((s) => ({ ...s, durationMinutes: minutes }));
 
@@ -387,6 +391,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       mediaUrl: state.mediaUrl,
       scheduledAt: state.scheduledAt,
       durationMinutes: state.durationMinutes,
+      timeType: state.timeType,
     };
 
     // Diagnóstico rápido
@@ -446,6 +451,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setCustomIssues,
       setDetails,
       setMediaUrl,
+      setTimeType,
       loadIssues,
       loadPartCategories,
       loadVehicleTypes,

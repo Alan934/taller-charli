@@ -160,7 +160,11 @@ const History: React.FC = () => {
                         <tbody className="divide-y divide-[#dbe1e6] dark:divide-[#2A3B4C]">
                             {filtered.map((row) => (
                                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-[#202E3C] transition-colors">
-                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200 font-medium whitespace-nowrap">{new Date(row.scheduledAt).toLocaleString()}</td>
+                                    <td className="p-4 text-sm text-[#111518] dark:text-gray-200 font-medium whitespace-nowrap">
+                                      {row.timeType && row.timeType !== 'SPECIFIC'
+                                        ? `${new Date(row.scheduledAt).toLocaleDateString()} (${row.timeType === 'MORNING' ? 'Mañana' : 'Tarde'})`
+                                        : new Date(row.scheduledAt).toLocaleString()}
+                                    </td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.assetType}</td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">{row.code.slice(0, 8)}</td>
                                     <td className="p-4 text-sm text-[#111518] dark:text-gray-200">

@@ -1,4 +1,4 @@
-import { AssetType } from '../types/enums';
+import { AssetType, BookingTimeType } from '../types/enums';
 
 export const BookingStatus = {
   PENDING: 'PENDING',
@@ -113,6 +113,7 @@ export interface CreateBookingPayload {
   mediaUrl?: string;
   scheduledAt: string; // ISO
   durationMinutes?: number;
+  timeType?: BookingTimeType;
 }
 
 export interface BookingResponse {
@@ -123,6 +124,7 @@ export interface BookingResponse {
   durationMinutes: number;
   mediaUrl?: string | null;
   assetType?: AssetType;
+  timeType?: BookingTimeType;
 }
 
 export interface BookingUsedPart {
@@ -136,6 +138,7 @@ export interface BookingItem {
   code: string;
   status: BookingStatus;
   assetType: AssetType;
+  timeType?: BookingTimeType;
   scheduledAt: string;
   durationMinutes: number;
   mediaUrl?: string | null;
