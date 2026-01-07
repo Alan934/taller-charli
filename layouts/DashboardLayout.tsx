@@ -31,10 +31,15 @@ const DashboardLayout: React.FC = () => {
         <span className={`material-symbols-outlined ${isActive('/dashboard') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>dashboard</span>
         <p className="text-sm font-semibold leading-normal">Tablero</p>
       </a>
-      <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
-        <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">directions_car</span>
-        <p className="text-sm font-medium leading-normal">Mis Vehículos</p>
+
+      <a
+        onClick={() => goTo('/dashboard/vehicles')}
+        className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/vehicles') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+      >
+        <span className={`material-symbols-outlined ${isActive('/dashboard/vehicles') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>directions_car</span>
+        <p className="text-sm font-medium leading-normal">{user?.role === 'ADMIN' ? 'Gestión de Flota' : 'Mis Vehículos'}</p>
       </a>
+
       <a
         onClick={() => goTo('/dashboard/history')}
         className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/history') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
@@ -42,6 +47,7 @@ const DashboardLayout: React.FC = () => {
         <span className={`material-symbols-outlined ${isActive('/dashboard/history') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>history</span>
         <p className="text-sm font-medium leading-normal">Historial</p>
       </a>
+
       {user?.role === 'ADMIN' && (
         <a
           onClick={() => goTo('/dashboard/calendar')}
@@ -60,10 +66,6 @@ const DashboardLayout: React.FC = () => {
           <p className="text-sm font-medium leading-normal">Clientes</p>
         </a>
       )}
-      <a className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300 transition-colors group cursor-pointer">
-        <span className="material-symbols-outlined text-[#617989] dark:text-gray-400 group-hover:text-primary transition-colors">description</span>
-        <p className="text-sm font-medium leading-normal">Presupuestos</p>
-      </a>
       {user?.role === 'ADMIN' && (
         <a
           onClick={() => goTo('/dashboard/admin')}

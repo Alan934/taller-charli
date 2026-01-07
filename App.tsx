@@ -8,6 +8,7 @@ import DashboardHome from './pages/dashboard/DashboardHome';
 import RepairTracking from './pages/dashboard/RepairTracking';
 import Budget from './pages/dashboard/Budget';
 import History from './pages/dashboard/History';
+import MyVehicles from './pages/dashboard/MyVehicles';
 import CalendarView from './pages/dashboard/CalendarView';
 import AdminClients from './pages/dashboard/AdminClients';
 import AdminSettings from './pages/dashboard/AdminSettings';
@@ -103,6 +104,7 @@ const App: React.FC = () => {
             <Route path="repair/:id" element={<RepairTracking />} />
             <Route path="budget/:id" element={<Budget />} />
             <Route path="history" element={<History />} />
+            <Route path="vehicles" element={<MyVehicles />} />
             <Route path="calendar" element={<CalendarView />} />
             <Route path="clients" element={<AdminClients />} />
             <Route path="admin" element={<AdminSettings />} />
