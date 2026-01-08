@@ -37,6 +37,7 @@ interface BookingContextValue extends BookingState {
   vehicleTypes: VehicleTypeOption[];
   vehicleBrands: VehicleBrandOption[];
   slots: string[];
+  dayRanges: { start: string; end: string }[];
   availability: Record<string, number>;
   loadingIssues: boolean;
   loadingPartCategories: boolean;
@@ -88,6 +89,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([]);
   const [vehicleBrands, setVehicleBrands] = useState<VehicleBrandOption[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
+  const [dayRanges, setDayRanges] = useState<{ start: string; end: string }[]>([]);
   const [availability, setAvailability] = useState<Record<string, number>>({});
   const availabilityCache = useRef<Record<string, number>>({});
   const [loadingIssues, setLoadingIssues] = useState(false);
@@ -268,6 +270,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const res = await bookingApi.getSlots({ date, assetType, durationMinutes }, token);
         setSlots(res.slots);
+        setDayRanges(res.ranges || []);
         return res;
       } finally {
         setLoadingSlots(false);
@@ -434,6 +437,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       vehicleTypes,
       vehicleBrands,
       slots,
+      dayRanges,
       loadingIssues,
       loadingPartCategories,
       loadingVehicleTypes,
@@ -469,6 +473,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       issues,
       partCategories,
       slots,
+      dayRanges,
       loadingIssues,
       loadingPartCategories,
       loadingSlots,

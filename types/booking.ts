@@ -83,6 +83,7 @@ export type WorkdayOverrideInput = Pick<WorkdayOverride, 'date' | 'maxBookings'>
 export interface SlotResponse {
   date: string; // YYYY-MM-DD
   slots: string[]; // ISO timestamps
+  ranges?: { start: string; end: string }[];
 }
 
 export interface CreateBookingPayload {

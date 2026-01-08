@@ -10,6 +10,7 @@ const BookingStep4: React.FC = () => {
   const {
     assetType,
     slots,
+    dayRanges,
     loadSlots,
     availability,
     loadingAvailability,
@@ -52,7 +53,7 @@ const BookingStep4: React.FC = () => {
     const mm = Number(parts.minute);
     const ss = Number(parts.second);
     const date = new Date(Date.UTC(y, m - 1, d, hh, mm, ss));
-    return { date, y, m, d };
+    return { date, y, m, d, hh, mm };
   };
 
   const todayIso = useMemo(() => {
@@ -151,8 +152,109 @@ const BookingStep4: React.FC = () => {
 
   const filteredSlots = useMemo(() => {
     const now = getNowZoned().date;
-    return slots.filter((s) => new Date(s) >= now);
+    return slots.filter((s) => {
+      const { y, m, d, hh, mm } = getZonedParts(s);
+      // Comparamos usando partes locales convertidas a UTC para consistencia
+      const slotTime = new Date(Date.UTC(y, m - 1, d, hh, mm));
+      return slotTime >= now;
+    });
   }, [slots]);
+
+  // Generamos información dinámica de los turnos basada en los slots disponibles
+  const shiftInfo = useMemo(() => {
+    const morningSlots: string[] = [];
+    const afternoonSlots: string[] = [];
+    const dur = durationMinutes || 60;
+
+    // Clasificar slots en mañana vs tarde (corte arbitrario 14hs)
+    filteredSlots.forEach((slot) => {
+      const { hh } = getZonedParts(slot);
+      if (hh < 14) {
+        morningSlots.push(slot);
+      } else {
+        afternoonSlots.push(slot);
+      }
+    });
+
+    // Lógica para deshabilitar si ya pasó el turno (solo para el día actual)
+    // Basado en hora Argentina
+    const isToday = date === todayIso;
+    const { hh: currentH, mm: currentM } = getNowZoned();
+    const currentMinutes = currentH * 60 + currentM;
+
+    let disableMorning = false;
+    let disableAfternoon = false;
+
+    // Obtener límites reales de la configuración
+    // Default fallback si no hay dayRanges
+    let morningCutoff = 13 * 60; 
+    let afternoonCutoff = 23 * 60 + 59; 
+
+    if (dayRanges && dayRanges.length > 0) {
+      // Turno Mañana (start < 13)
+      const mRange = dayRanges.find((r) => parseInt(r.start.split(':')[0]) < 13);
+      if (mRange) {
+        const [endsH, endsM] = mRange.end.split(':').map(Number);
+        morningCutoff = endsH * 60 + endsM;
+      }
+      // Turno Tarde (start >= 13)
+      const aRange = dayRanges.find((r) => parseInt(r.start.split(':')[0]) >= 13);
+      if (aRange) {
+        const [endsH, endsM] = aRange.end.split(':').map(Number);
+        afternoonCutoff = endsH * 60 + endsM;
+      }
+    }
+
+    if (isToday) {
+      if (currentMinutes >= morningCutoff) disableMorning = true;
+      if (currentMinutes >= afternoonCutoff) disableAfternoon = true;
+    }
+
+    const formatTime = (iso: string) => {
+      const { hh, mm } = getZonedParts(iso);
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
+
+    const getRangeLabel = (isMorning: boolean, group: string[]) => {
+      // Prioridad: Usar rangos reales devueltos por el backend (workdays)
+      if (dayRanges && dayRanges.length > 0) {
+        const matchingStart = dayRanges.find((r) => {
+           const [h, m] = r.start.split(':').map(Number);
+           // Rango inicia en la mañana si < 13:00, tarde si >= 13:00
+           return isMorning ? h < 13 : h >= 13;
+        });
+        if (matchingStart) {
+           return `${matchingStart.start.substring(0, 5)} - ${matchingStart.end.substring(0, 5)}`;
+        }
+      }
+
+      if (group.length === 0) return 'No disponible';
+      const first = group[0];
+      const last = group[group.length - 1];
+      
+      const startLabel = formatTime(first);
+      
+      // Calcular hora final del último slot
+      const lastDate = new Date(last);
+      const endDate = new Date(lastDate.getTime() + dur * 60000);
+      const endLabel = formatTime(endDate.toISOString());
+      
+      return `${startLabel} - ${endLabel}`;
+    };
+
+    return {
+      morning: {
+        available: !disableMorning && morningSlots.length > 0,
+        label: getRangeLabel(true, morningSlots),
+        firstSlot: morningSlots[0],
+      },
+      afternoon: {
+        available: !disableAfternoon && afternoonSlots.length > 0,
+        label: getRangeLabel(false, afternoonSlots),
+        firstSlot: afternoonSlots[0],
+      },
+    };
+  }, [filteredSlots, durationMinutes, dayRanges, date, todayIso]);
 
   const confirm = async () => {
     setLocalError(null);
@@ -389,39 +491,44 @@ const BookingStep4: React.FC = () => {
                   {tab === 'SHIFT' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
+                        disabled={!shiftInfo.morning.available}
                         className={`h-16 rounded-xl border flex flex-col items-center justify-center transition-all ${
                           timeType === BookingTimeType.MORNING && scheduledAt
                             ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500'
+                            : !shiftInfo.morning.available
+                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
                             : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-200 hover:bg-emerald-50/50'
                         }`}
                         onClick={() => {
-                          // Construct generic morning time (08:00)
-                          // Assuming -03:00 fixed
-                          const iso = new Date(`${date}T08:00:00-03:00`).toISOString();
-                          setScheduledAt(iso);
+                          if (!shiftInfo.morning.available) return;
+                          // Usar el primer slot real disponible
+                          setScheduledAt(shiftInfo.morning.firstSlot);
                           setTimeType(BookingTimeType.MORNING);
                           setDuration(durationMinutes ?? undefined);
                         }}
                       >
                         <span className="font-bold text-base">Turno Mañana</span>
-                        <span className="text-xs opacity-75">8:00 - 13:00</span>
+                        <span className="text-xs opacity-75">{shiftInfo.morning.label}</span>
                       </button>
                       <button
+                        disabled={!shiftInfo.afternoon.available}
                         className={`h-16 rounded-xl border flex flex-col items-center justify-center transition-all ${
                           timeType === BookingTimeType.AFTERNOON && scheduledAt
                             ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500'
+                            : !shiftInfo.afternoon.available
+                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
                             : 'border-gray-200 bg-white text-gray-700 hover:border-emerald-200 hover:bg-emerald-50/50'
                         }`}
                         onClick={() => {
-                          // Construct generic afternoon time (16:00)
-                          const iso = new Date(`${date}T16:00:00-03:00`).toISOString();
-                          setScheduledAt(iso);
+                          if (!shiftInfo.afternoon.available) return;
+                          // Usar el primer slot real disponible
+                          setScheduledAt(shiftInfo.afternoon.firstSlot);
                           setTimeType(BookingTimeType.AFTERNOON);
                           setDuration(durationMinutes ?? undefined);
                         }}
                       >
                         <span className="font-bold text-base">Turno Tarde</span>
-                        <span className="text-xs opacity-75">16:00 - 20:00</span>
+                        <span className="text-xs opacity-75">{shiftInfo.afternoon.label}</span>
                       </button>
                     </div>
                   ) : (
