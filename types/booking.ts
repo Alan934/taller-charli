@@ -105,6 +105,7 @@ export interface CreateBookingPayload {
     vinOrPlate?: string;
     notes?: string;
   };
+  existingVehicleId?: number;
   part?: {
     partCategoryId: number;
     description: string;

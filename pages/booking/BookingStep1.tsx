@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { bookingApi } from '../../services/booking';
 import { usersApi } from '../../services/users';
+import { vehiclesApi } from '../../services/vehicles';
 import { CustomerSummary, CustomerVehicle } from '../../types/booking';
 
 const BookingStep1: React.FC = () => {
@@ -99,12 +100,14 @@ const BookingStep1: React.FC = () => {
   useEffect(() => {
     if (isAdmin && selectedCustomer && !customerVehicles.length && !loadingVehicles) {
       loadVehiclesForCustomer(selectedCustomer.id).catch(() => undefined);
+    } else if (!isAdmin && user?.id && !customerVehicles.length && !loadingVehicles) {
+      loadVehiclesForCustomer(user.id).catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCustomer?.id]);
+  }, [selectedCustomer?.id, user?.id, isAdmin]);
 
   useEffect(() => {
-    if (selectedCustomer) {
+    if (selectedCustomer || (!isAdmin && user)) {
       setUseExistingVehicle(true);
     } else {
       setUseExistingVehicle(false);
@@ -113,7 +116,7 @@ const BookingStep1: React.FC = () => {
     }
     // we intentionally ignore setters in deps to avoid re-runs on stable refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCustomer?.id]);
+  }, [selectedCustomer?.id, user?.id, isAdmin]);
 
   const searchCustomers = async () => {
     if (!isAdmin || !token) return;
@@ -135,10 +138,20 @@ const BookingStep1: React.FC = () => {
   };
 
   const loadVehiclesForCustomer = async (customerId: number) => {
-    if (!token || !isAdmin) return;
+    if (!token) return;
     setLoadingVehicles(true);
     try {
-      const res = await bookingApi.listCustomerVehicles(customerId, token);
+      let res: CustomerVehicle[] = [];
+      
+      // Si soy admin viendo otro cliente, uso endpoint de admin
+      if (isAdmin && customerId !== user?.id) {
+         res = await bookingApi.listCustomerVehicles(customerId, token);
+      } else {
+         // Si es para mí mismo (sea admin o user normal), uso endpoint /me
+         // Nota: getMyVehicles retorna CustomerVehicle[] (tipado compatible)
+         res = await vehiclesApi.getMyVehicles(token);
+      }
+
       setCustomerVehicles(res);
       if (res.length) {
         setSelectedVehicleId(res[0].id);
@@ -151,7 +164,8 @@ const BookingStep1: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      setError('No se pudieron cargar los vehículos del cliente.');
+      // Don't show error if it's just empty or permission issue for safety, but log it
+      // setError('No se pudieron cargar los vehículos.');
     } finally {
       setLoadingVehicles(false);
     }
@@ -263,17 +277,24 @@ const BookingStep1: React.FC = () => {
         setError('Seleccioná un cliente existente o crea uno nuevo.');
         return;
       }
+    } else {
+       // Si es cliente normal, el customerId es el propio usuario
+       if (user?.id) {
+          setCustomerId(user.id);
+       }
     }
 
     if (assetType === 'VEHICLE') {
-      if (isAdmin && useExistingVehicle) {
-        if (!selectedCustomer) {
+      if (useExistingVehicle) {
+        // Validation for existing vehicle (Admin selecting for client OR Client selecting their own)
+        if (isAdmin && !selectedCustomer) {
           setError('Seleccioná un cliente para poder elegir un vehículo.');
           return;
         }
+        
         const vehicleToUse = selectedVehicleId ?? (customerVehicles.length ? customerVehicles[0].id : undefined);
         if (!vehicleToUse) {
-          setError(customerVehicles.length ? 'Elegí un vehículo existente.' : 'El cliente no tiene vehículos cargados.');
+          setError(customerVehicles.length ? 'Elegí un vehículo existente.' : 'No tenés vehículos cargados.');
           return;
         }
         setSelectedVehicleId(vehicleToUse);
@@ -289,8 +310,6 @@ const BookingStep1: React.FC = () => {
             model: selectedV.model,
             year: selectedV.year || undefined,
           });
-        } else {
-          setVehicle(undefined);
         }
       } else {
         if (!vehicleForm.typeId) {
@@ -343,550 +362,341 @@ const BookingStep1: React.FC = () => {
   };
 
   return (
-    <div className="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col">
-      <BookingHeader />
-      <div className="flex flex-1 flex-col items-center w-full px-4 md:px-40 py-8">
-        <div className="layout-content-container flex flex-col max-w-[800px] w-full flex-1 gap-6">
-          {/* Page Heading & Progress */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap justify-between items-end gap-3">
-              <div className="flex min-w-72 flex-col gap-2">
-                <p className="text-[#111518] dark:text-white tracking-tight text-[32px] font-bold leading-tight">Solicitar Turno</p>
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">1</span>
-                  <p className="text-[#617989] dark:text-slate-400 text-sm font-medium leading-normal">Tipo de Servicio</p>
-                </div>
-              </div>
-            </div>
-            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
-              <div className="h-full bg-primary w-1/3 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="py-4 text-center">
-            <h2 className="text-[#111518] dark:text-white tracking-tight text-[28px] font-bold leading-tight pb-3">¿Qué necesitas reparar hoy?</h2>
-            <p className="text-[#617989] dark:text-slate-400 text-base font-normal leading-normal max-w-lg mx-auto">
-              Selecciona si traerás el vehículo completo o solo una parte eléctrica para reparar en banco.
+    <div className="bg-[#f8f9fa] dark:bg-[#0f1720] font-sans antialiased min-h-screen flex flex-col">
+      <BookingHeader step={1} title="Seleccioná tu servicio" />
+      <div className="flex flex-1 flex-col items-center w-full px-4 md:px-8 py-8 md:py-12">
+        <div className="layout-content-container flex flex-col max-w-[900px] w-full flex-1 gap-8">
+          
+          <div className="text-center space-y-2 mb-4">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              ¿Qué vamos a reparar hoy?
+            </h1>
+            <p className="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              Elegí el tipo de servicio para comenzar tu reserva. Si traes el vehículo completo o solo una pieza suelta.
             </p>
           </div>
 
           {isAdmin && (
-            <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="bg-white dark:bg-[#1e293b] rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col gap-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-bold text-[#111518] dark:text-white">Cliente</p>
-                  <p className="text-xs text-[#617989] dark:text-slate-400">Busca un cliente existente o cargá uno nuevo.</p>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-500">person_search</span>
+                    Gestión de Cliente (Admin)
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Asigná el turno a un cliente registrado o nuevo.</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-semibold">
-                  {selectedCustomer && (
-                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary">
-                      {selectedCustomer.fullName ?? selectedCustomer.email}
-                    </span>
-                  )}
-                  {pendingNewCustomer && (
-                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700">
-                      Nuevo cliente listo
-                    </span>
-                  )}
+                <div className="flex items-center gap-2">
+                   {/* Status Badges */}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col md:flex-row gap-3">
-                  <input
-                    className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="Buscar por email o nombre"
-                    value={customerQuery}
-                    onChange={(e) => setCustomerQuery(e.target.value)}
-                  />
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">search</span>
+                    <input
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                      placeholder="Buscar por DNI, email o nombre..."
+                      value={customerQuery}
+                      onChange={(e) => setCustomerQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && searchCustomers()}
+                    />
+                  </div>
                   <button
                     onClick={searchCustomers}
                     type="button"
-                    className="h-11 px-4 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 disabled:bg-slate-300"
+                    className="h-11 px-5 rounded-xl bg-slate-800 dark:bg-slate-700 text-white font-semibold hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors shadow-sm whitespace-nowrap"
                     disabled={searchingCustomers || !token}
                   >
-                    {searchingCustomers ? 'Buscando...' : 'Buscar cliente'}
+                    {searchingCustomers ? '...' : 'Buscar'}
                   </button>
                   <button
                     type="button"
                     onClick={openCustomerModal}
-                    className="h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:border-primary hover:text-primary"
+                    className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
                   >
-                    Nuevo cliente
+                    + Nuevo
                   </button>
                 </div>
 
+                {/* Resultados de búsqueda flotantes o en lista */}
                 {!!customerResults.length && (
-                  <div className="grid md:grid-cols-2 gap-2">
+                  <div className="grid sm:grid-cols-2 gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 max-h-48 overflow-y-auto">
                     {customerResults.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => selectCustomer(c)}
-                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${
+                        className={`text-left rounded-lg p-3 transition-all flex items-center justify-between group ${
                           selectedCustomer?.id === c.id
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-1 ring-emerald-500'
+                            : 'hover:bg-white dark:hover:bg-slate-700'
                         }`}
                       >
-                        <p className="text-sm font-semibold">{c.fullName ?? 'Cliente sin nombre'}</p>
-                        <p className="text-xs text-slate-500">{c.email}</p>
+                        <div>
+                           <p className="text-sm font-bold text-slate-800 dark:text-white">{c.fullName ?? 'Sin nombre'}</p>
+                           <p className="text-xs text-slate-500">{c.email}</p>
+                        </div>
+                        {selectedCustomer?.id === c.id && <span className="material-symbols-outlined text-emerald-600 text-lg">check_circle</span>}
                       </button>
                     ))}
                   </div>
                 )}
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-3 text-sm text-slate-600 dark:text-slate-300 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">Cliente seleccionado</span>
-                      {selectedCustomer && (
-                        <button
-                          type="button"
-                          className="text-xs text-primary hover:underline"
-                          onClick={resetNewCustomer}
-                        >
-                          Limpiar
-                        </button>
-                      )}
-                    </div>
-                    {selectedCustomer ? (
-                      <div className="flex flex-col gap-1">
-                        <span>{selectedCustomer.fullName ?? 'Sin nombre'}</span>
-                        <span className="text-xs text-slate-500">{selectedCustomer.email}</span>
-                      </div>
-                    ) : (
-                      <span className="text-slate-500">Sin cliente seleccionado.</span>
-                    )}
+                {/* Cliente Seleccionado Card */}
+                {(selectedCustomer || pendingNewCustomer) && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10 dark:border-emerald-800 p-4 flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-700 dark:text-emerald-200 font-bold">
+                           {selectedCustomer ? selectedCustomer.fullName?.[0] || 'C' : 'N'}
+                        </div>
+                        <div>
+                           <p className="text-sm font-bold text-slate-800 dark:text-white">
+                              {selectedCustomer ? selectedCustomer.fullName : pendingNewCustomer?.fullName}
+                           </p>
+                           <p className="text-xs text-slate-500">
+                              {selectedCustomer ? selectedCustomer.email : 'Nuevo cliente (Borrador)'}
+                           </p>
+                        </div>
+                     </div>
+                     <button
+                        type="button"
+                        onClick={resetNewCustomer}
+                        className="text-xs font-semibold text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                     >
+                        Desvincular
+                     </button>
                   </div>
-
-                  <div className="rounded-lg border border-dashed border-amber-200 dark:border-amber-600 p-3 text-sm text-slate-700 dark:text-slate-200 flex flex-col gap-2 bg-amber-50/60 dark:bg-amber-900/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="font-semibold">Nuevo cliente</span>
-                        <span className="text-xs text-amber-700 dark:text-amber-200">Se creará al confirmar el turno.</span>
-                      </div>
-                      {pendingNewCustomer && (
-                        <button type="button" className="text-xs text-primary hover:underline" onClick={openCustomerModal}>
-                          Editar
-                        </button>
-                      )}
-                    </div>
-                    {pendingNewCustomer ? (
-                      <div className="flex flex-col gap-1 text-sm">
-                        <span className="font-semibold">{pendingNewCustomer.fullName || 'Sin nombre'}</span>
-                        <span className="text-slate-600 dark:text-slate-200">{pendingNewCustomer.email}</span>
-                        <span className="text-xs text-slate-500">Tel: {pendingNewCustomer.phone}</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-2 text-slate-600 dark:text-slate-300">
-                        <span>Carga los datos desde el modal para crear un cliente nuevo.</span>
-                        <button
-                          type="button"
-                          className="self-start text-sm font-semibold text-primary hover:underline"
-                          onClick={openCustomerModal}
-                        >
-                          Abrir formulario
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500">El cliente se creará al confirmar el turno; evitamos duplicados si algo falla en el resto del flujo.</p>
+                )}
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-            {/* Vehicle Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Opción Vehículo */}
             <div 
               onClick={() => setAssetType('VEHICLE')}
-              className="group relative cursor-pointer flex flex-col bg-white dark:bg-[#1a2632] rounded-xl border-2 border-transparent hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-primary/50"
+              className={`relative cursor-pointer group rounded-3xl p-6 transition-all duration-300 border-2 ${
+                  assetType === 'VEHICLE' 
+                  ? 'bg-white dark:bg-slate-800 border-emerald-500 shadow-xl shadow-emerald-500/10 scale-100 ring-4 ring-emerald-500/10' 
+                  : 'bg-white dark:bg-slate-800 border-transparent hover:border-emerald-200 hover:shadow-lg scale-95 opacity-80 hover:opacity-100 hover:scale-100'
+              }`}
             >
-              <div className="absolute top-4 right-4 h-6 w-6 rounded-full border-2 border-slate-300 dark:border-slate-600 group-hover:border-primary group-active:bg-primary group-active:border-primary transition-colors flex items-center justify-center">
-                 <div className={`h-3 w-3 rounded-full ${assetType === 'VEHICLE' ? 'bg-primary opacity-100' : 'bg-transparent'} transition-opacity`}></div>
-              </div>
-              <div className="h-40 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-7xl text-primary/80">local_shipping</span>
-              </div>
-              <div className="p-6 flex flex-col gap-2">
-                <h3 className="text-[#111518] dark:text-white text-xl font-bold leading-tight group-hover:text-primary transition-colors">Vehículo Completo</h3>
-                <p className="text-[#617989] dark:text-slate-400 text-sm leading-relaxed">
-                  Traerás el vehículo al taller. Incluye autos, camionetas, camiones, tractores o motos.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {['Auto', 'Camión', 'Tractor'].map(tag => (
-                    <span key={tag} className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-500/10">{tag}</span>
-                  ))}
+              <div className="flex justify-between items-start mb-6">
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-colors ${assetType === 'VEHICLE' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                   <span className="material-symbols-outlined text-3xl">directions_car</span>
                 </div>
+                {assetType === 'VEHICLE' && <div className="bg-emerald-500 text-white p-1 rounded-full"><span className="material-symbols-outlined text-lg">check</span></div>}
               </div>
-            </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Vehículo Completo</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                 Ideal para service, diagnóstico general, o reparaciones donde necesitamos el auto en el taller.
+              </p>
+              
+              {/* Formulario embebido al seleccionar */}
+              {assetType === 'VEHICLE' && (
+                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 animate-fadeIn">
+                    {/* Lógica de selección de vehículo (Admin o Cliente) */}
+                    {(isAdmin && selectedCustomer) || (!isAdmin && user) ? (
+                       <div className="flex flex-col gap-3">
+                          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                             {isAdmin ? 'Vehículo del cliente' : 'Mis Vehículos'}
+                          </label>
+                          {!customerVehicles.length && !loadingVehicles ? (
+                             <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg">
+                                {isAdmin ? 'El cliente no tiene vehículos. Cargá uno abajo.' : 'No tenés vehículos guardados. Agregá uno nuevo.'}
+                             </div>
+                          ) : null}
+                          
+                          <div className="flex gap-2 mb-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-lg">
+                             <button 
+                                type="button"
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${useExistingVehicle ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}`}
+                                onClick={() => setUseExistingVehicle(true)}
+                                disabled={!customerVehicles.length}
+                             >Existente</button>
+                             <button
+                                type="button"
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${!useExistingVehicle ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}`}
+                                onClick={() => { setUseExistingVehicle(false); setExistingVehicleId(undefined); }}
+                             >Nuevo</button>
+                          </div>
 
-            {/* Part Card */}
-             <div 
-               onClick={() => setAssetType('PART')}
-               className="group relative cursor-pointer flex flex-col bg-white dark:bg-[#1a2632] rounded-xl border-2 border-transparent hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-primary/50"
-             >
-                <div className="absolute top-4 right-4 h-6 w-6 rounded-full border-2 border-slate-300 dark:border-slate-600 group-hover:border-primary transition-colors flex items-center justify-center">
-                  <div className={`h-3 w-3 rounded-full ${assetType === 'PART' ? 'bg-primary opacity-100' : 'bg-transparent'} transition-opacity`}></div>
-                </div>
-              <div className="h-40 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-7xl text-amber-500/80">electrical_services</span>
-              </div>
-              <div className="p-6 flex flex-col gap-2">
-                <h3 className="text-[#111518] dark:text-white text-xl font-bold leading-tight group-hover:text-primary transition-colors">Pieza / Repuesto</h3>
-                <p className="text-[#617989] dark:text-slate-400 text-sm leading-relaxed">
-                  Traerás la pieza suelta para reparación en banco. Alternadores, arranques, baterías.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                   {(partCategories.length ? partCategories.slice(0, 3) : [])
-                     .map((cat) => (
-                       <span
-                         key={cat.id}
-                         className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-500/10"
-                       >
-                         {cat.name}
-                       </span>
-                     ))}
-                   {!partCategories.length && (
-                     <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 ring-1 ring-inset ring-slate-500/10">
-                       Categorías pronto
-                     </span>
-                   )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-4">
-            {assetType === 'VEHICLE' ? (
-              <div className="flex flex-col gap-4">
-                {isAdmin && selectedCustomer && (
-                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-[#111518] dark:text-white">Vehículos del cliente</span>
-                        <span className="text-xs text-slate-500">Elegí uno existente o cargá uno nuevo.</span>
-                      </div>
-                      <div className="flex gap-2 text-xs">
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded-lg border ${
-                            useExistingVehicle
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-slate-300 text-slate-600 dark:text-slate-300'
-                          }`}
-                          onClick={() => setUseExistingVehicle(true)}
-                          disabled={!customerVehicles.length}
-                        >
-                          Usar existente
-                        </button>
-                        <button
-                          type="button"
-                          className={`px-3 py-1 rounded-lg border ${
-                            !useExistingVehicle
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-slate-300 text-slate-600 dark:text-slate-300'
-                          }`}
-                          onClick={() => {
-                            setUseExistingVehicle(false);
-                            setExistingVehicleId(undefined);
-                          }}
-                        >
-                          Nuevo vehículo
-                        </button>
-                      </div>
-                    </div>
-
-                    {useExistingVehicle ? (
-                      <div className="flex flex-col gap-2">
-                        {loadingVehicles && <p className="text-sm text-slate-500">Cargando vehículos...</p>}
-                        {!loadingVehicles && !customerVehicles.length && (
-                          <p className="text-sm text-slate-500">El cliente no tiene vehículos cargados.</p>
-                        )}
-                        {!!customerVehicles.length && (
-                          <select
-                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                            value={selectedVehicleId ?? ''}
-                            onChange={(e) => {
-                              const value = Number(e.target.value) || undefined;
-                              setSelectedVehicleId(value);
-                              setExistingVehicleId(value);
-                            }}
-                          >
-                            <option value="" disabled>
-                              {loadingVehicles ? 'Cargando...' : 'Seleccioná un vehículo'}
-                            </option>
-                            {customerVehicles.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {[v.type?.name, v.brand?.name ?? v.brandOther, v.model, v.year].filter(Boolean).join(' ')}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
+                          {useExistingVehicle && (
+                             <select className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm py-2.5" 
+                                value={selectedVehicleId ?? ''}
+                                onChange={(e) => {
+                                   const vid = Number(e.target.value);
+                                   setSelectedVehicleId(vid);
+                                   setExistingVehicleId(vid);
+                                }}
+                             >
+                                <option disabled value="">Seleccionar...</option>
+                                {customerVehicles.map(v => <option key={v.id} value={v.id}>{v.brand?.name || v.brandOther} {v.model} ({v.year})</option>)}
+                             </select>
+                          )}
+                       </div>
                     ) : null}
-                  </div>
-                )}
 
-                {!useExistingVehicle && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Tipo
-                      <select
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                        value={vehicleForm.typeId ?? ''}
-                        onChange={(e) =>
-                          setVehicleForm((f) => ({ ...f, typeId: Number(e.target.value) || undefined }))
-                        }
-                        disabled={loadingVehicleTypes}
-                      >
-                        <option value="" disabled>
-                          {loadingVehicleTypes ? 'Cargando tipos...' : 'Seleccioná un tipo'}
-                        </option>
-                        {vehicleTypes.map((type) => (
-                          <option key={type.id} value={type.id}>
-                            {type.name}
-                          </option>
-                        ))}
-                      </select>
-                      {!loadingVehicleTypes && !vehicleTypes.length && (
-                        <span className="text-xs text-red-500">No hay tipos cargados. Consulta con un administrador.</span>
-                      )}
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Marca
-                      <select
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                        value={vehicleForm.brandId ?? (vehicleForm.brandOther ? 'OTHER' : '')}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === 'OTHER') {
-                            setVehicleForm((f) => ({ ...f, brandId: undefined, brandOther: '' }));
-                          } else {
-                            setVehicleForm((f) => ({ ...f, brandId: Number(value) || undefined, brandOther: '' }));
-                          }
-                        }}
-                        disabled={loadingVehicleBrands}
-                      >
-                        <option value="" disabled>
-                          {loadingVehicleBrands ? 'Cargando marcas...' : 'Seleccioná una marca'}
-                        </option>
-                        {vehicleBrands.map((brand) => (
-                          <option key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </option>
-                        ))}
-                        <option value="OTHER">Otros</option>
-                      </select>
-                      {(!loadingVehicleBrands && !vehicleBrands.length) && (
-                        <span className="text-xs text-red-500">No hay marcas cargadas. Consulta con un administrador.</span>
-                      )}
-                      {vehicleForm.brandId === undefined && (
-                        <input
-                          className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                          placeholder="Otra marca"
-                          value={vehicleForm.brandOther}
-                          onChange={(e) => setVehicleForm((f) => ({ ...f, brandOther: e.target.value }))}
-                        />
-                      )}
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Modelo
-                      <input
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                        value={vehicleForm.model}
-                        onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value }))}
-                        required
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Año (opcional)
-                      <input
-                        type="number"
-                        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                        value={vehicleForm.year}
-                        onChange={(e) => setVehicleForm((f) => ({ ...f, year: e.target.value }))}
-                      />
-                    </label>
-                  </div>
-                )}
+                    {/* Formulario de carga manual (si es nuevo o user normal) */}
+                    {!useExistingVehicle && (
+                       <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                             <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo</label>
+                                <select 
+                                   className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm py-2"
+                                   value={vehicleForm.typeId ?? ''}
+                                   onChange={(e) => setVehicleForm(f => ({...f, typeId: Number(e.target.value)}))}
+                                >
+                                   {vehicleTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                             </div>
+                             <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Marca</label>
+                                <select 
+                                   className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm py-2"
+                                   value={vehicleForm.brandId ?? (vehicleForm.brandOther ? 'OTHER' : '')}
+                                   onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === 'OTHER') setVehicleForm(f => ({...f, brandId: undefined, brandOther: ''}));
+                                      else setVehicleForm(f => ({...f, brandId: Number(val), brandOther: ''}));
+                                   }}
+                                >
+                                   {vehicleBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                   <option value="OTHER">Otra</option>
+                                </select>
+                             </div>
+                          </div>
+                          {vehicleForm.brandId === undefined && (
+                             <input 
+                                className="w-full rounded-xl border-slate-200 bg-slate-50 text-sm px-3 py-2"
+                                placeholder="Escribe la marca..."
+                                value={vehicleForm.brandOther}
+                                onChange={(e) => setVehicleForm(f => ({...f, brandOther: e.target.value}))}
+                             />
+                          )}
+                          <input 
+                             className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm px-3 py-2"
+                             placeholder="Modelo (Ej: Gol Trend, Hilux...)"
+                             value={vehicleForm.model}
+                             onChange={(e) => setVehicleForm(f => ({...f, model: e.target.value}))}
+                          />
+                       </div>
+                    )}
+                 </div>
+              )}
+            </div>
+
+            {/* Opción Pieza */}
+            <div 
+              onClick={() => setAssetType('PART')}
+              className={`relative cursor-pointer group rounded-3xl p-6 transition-all duration-300 border-2 ${
+                  assetType === 'PART' 
+                  ? 'bg-white dark:bg-slate-800 border-amber-500 shadow-xl shadow-amber-500/10 scale-100 ring-4 ring-amber-500/10' 
+                  : 'bg-white dark:bg-slate-800 border-transparent hover:border-amber-200 hover:shadow-lg scale-95 opacity-80 hover:opacity-100 hover:scale-100'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-colors ${assetType === 'PART' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                   <span className="material-symbols-outlined text-3xl">build</span>
+                </div>
+                {assetType === 'PART' && <div className="bg-amber-500 text-white p-1 rounded-full"><span className="material-symbols-outlined text-lg">check</span></div>}
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Categoría
-                  <select
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    value={partForm.partCategoryId ?? ''}
-                    onChange={(e) => {
-                      const id = Number(e.target.value);
-                      const cat = partCategories.find((c) => c.id === id);
-                      const isOther = cat?.code === 'OTHER' || ['otro', 'otros', 'other'].includes(cat?.name.toLowerCase() || '');
-                      
-                      setPartForm((f) => ({ 
-                        ...f, 
-                        partCategoryId: id,
-                        description: isOther ? f.description : (cat?.name || '') 
-                      }));
-                    }}
-                    disabled={loadingPartCategories}
-                  >
-                    <option value="" disabled>
-                      {loadingPartCategories ? 'Cargando...' : 'Seleccioná una categoría'}
-                    </option>
-                    {partCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!loadingPartCategories && !partCategories.length && (
-                    <span className="text-xs text-red-500">No hay categorías disponibles. Consulta con un administrador.</span>
-                  )}
-                </label>
-                
-                {isSelectedCategoryOther() && (
-                  <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Nombre de la pieza
-                    <input
-                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                      placeholder="Ej: Burro de arranque"
-                      value={partForm.description}
-                      onChange={(e) => setPartForm((f) => ({ ...f, description: e.target.value }))}
-                      required
-                    />
-                  </label>
-                )}
-              </div>
-            )}
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Pieza / Repuesto</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                 Trae solo el componente (burro, alternador, batería) para reparar en banco de pruebas.
+              </p>
+
+              {assetType === 'PART' && (
+                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 animate-fadeIn">
+                    <div className="space-y-3">
+                       <div>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">Categoría</label>
+                          <select 
+                             className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm py-2"
+                             value={partForm.partCategoryId ?? ''}
+                             onChange={(e) => {
+                                const id = Number(e.target.value);
+                                const cat = partCategories.find(c => c.id === id);
+                                const isOther = cat?.code === 'OTHER'; 
+                                setPartForm(f => ({ 
+                                  ...f, 
+                                  partCategoryId: id, 
+                                  description: isOther ? f.description : (cat?.name || '') 
+                                }));
+                             }}
+                          >
+                             {partCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                       </div>
+                       
+                       {isSelectedCategoryOther() && (
+                          <div>
+                             <label className="text-xs font-bold text-slate-500 mb-1 block">¿Qué pieza es?</label>
+                             <input 
+                                className="w-full rounded-xl border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm px-3 py-2"
+                                placeholder="Ej: Motor de limpiaparabrisas"
+                                value={partForm.description}
+                                onChange={(e) => setPartForm(f => ({...f, description: e.target.value}))}
+                             />
+                          </div>
+                       )}
+                    </div>
+                 </div>
+              )}
+            </div>
           </div>
 
-          <div className="flex justify-end pt-8 w-full">
-            {error && <p className="text-sm text-red-600 mr-auto">{error}</p>}
+          <div className="flex flex-col items-center mt-6">
+            {error && <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm mb-4 animate-shake">{error}</div>}
             <button 
               onClick={handleContinue}
-              className="flex min-w-[120px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-8 bg-primary hover:bg-primary/90 text-white text-base font-bold leading-normal tracking-[0.015em] shadow-sm transition-all"
+              className={`w-full max-w-sm h-14 rounded-2xl text-lg font-bold text-white shadow-lg shadow-emerald-500/20 transition-all transform active:scale-95 ${
+                 assetType === 'VEHICLE' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-amber-500 hover:bg-amber-600'
+              }`}
             >
-              <span className="truncate">Continuar</span>
-              <span className="material-symbols-outlined ml-2 text-sm">arrow_forward</span>
+              Continuar
             </button>
           </div>
         </div>
       </div>
 
+        {/* Modal Cliente Nuevo simplificado para este nuevo diseño */}
         {showCustomerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="w-full max-w-xl bg-white dark:bg-[#0f1720] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 relative">
-              <button
-                type="button"
-                className="absolute top-3 right-3 text-slate-500 hover:text-slate-800 dark:text-slate-400"
-                onClick={() => {
-                  setShowCustomerModal(false);
-                  setModalError(null);
-                }}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-
-              <div className="mb-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wide">Nuevo cliente</p>
-                    <h3 className="text-xl font-bold text-[#111518] dark:text-white">Datos de contacto</h3>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm select-none">
-                     <input 
-                       type="checkbox" 
-                       checked={isFastClient} 
-                       onChange={(e) => setIsFastClient(e.target.checked)} 
-                       className="rounded border-slate-300 text-primary focus:ring-primary"
-                     />
-                     <span className="text-slate-700 dark:text-slate-200 font-medium">Sin cuenta</span>
-                  </label>
-                </div>
-                {!isFastClient ? (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Se creará al confirmar el turno. Usuario y contraseña serán los ingresados.</p>
-                ) : (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Se creará inmediatamente con nombre y teléfono. No tendrá acceso a la plataforma.</p>
-                )}
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="w-full max-w-lg bg-white dark:bg-[#1a2632] rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                 <h3 className="font-bold text-lg text-slate-800 dark:text-white">Nuevo Cliente</h3>
+                 <button onClick={() => setShowCustomerModal(false)} className="h-8 w-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"><span className="material-symbols-outlined text-lg">close</span></button>
               </div>
+              <div className="p-6 space-y-4">
+                 <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-2">
+                    <button className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wide rounded-lg ${isFastClient ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`} onClick={() => setIsFastClient(true)}>Rápido</button>
+                    <button className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wide rounded-lg ${!isFastClient ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`} onClick={() => setIsFastClient(false)}>Cuenta Completa</button>
+                 </div>
+                 
+                 <div className="grid gap-3">
+                    <input className="w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3" placeholder="Nombre completo" value={newCustomerForm.fullName} onChange={e => setNewCustomerForm(p=>({...p, fullName: e.target.value}))} />
+                    <input className="w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3" placeholder="Teléfono" value={newCustomerForm.phone} onChange={e => setNewCustomerForm(p=>({...p, phone: e.target.value}))} />
+                    {!isFastClient && (
+                       <>
+                       <input className="w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3" placeholder="Email" type="email" value={newCustomerForm.email} onChange={e => setNewCustomerForm(p=>({...p, email: e.target.value}))} />
+                       <input className="w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3" placeholder="Contraseña" type="password" value={newCustomerForm.password} onChange={e => setNewCustomerForm(p=>({...p, password: e.target.value}))} />
+                       </>
+                    )}
+                 </div>
+                 
+                 {modalError && <p className="text-red-500 text-sm text-center">{modalError}</p>}
 
-              <div className="grid grid-cols-1 gap-3">
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Nombre completo
-                  <input
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="Ej: Juan Pérez"
-                    value={newCustomerForm.fullName}
-                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Teléfono
-                  <input
-                    type="tel"
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="2612465784"
-                    value={newCustomerForm.phone}
-                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    required
-                  />
-                </label>
-                
-                {!isFastClient && (
-                  <>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Correo
-                  <input
-                    type="email"
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="cliente@correo.com"
-                    value={newCustomerForm.email}
-                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Contraseña
-                  <input
-                    type="password"
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="Mínimo 8 caracteres"
-                    value={newCustomerForm.password}
-                    onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, password: e.target.value }))}
-                    required
-                    minLength={8}
-                  />
-                </label>
-                  </>
-                )}
-              </div>
-
-              {modalError && <p className="text-sm text-red-600 mt-3">{modalError}</p>}
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  className="px-4 h-10 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    setShowCustomerModal(false);
-                    setModalError(null);
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="px-5 h-10 rounded-lg bg-primary text-white font-semibold shadow hover:bg-primary/90"
-                  onClick={confirmNewCustomer}
-                >
-                  Guardar datos
-                </button>
+                 <button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl mt-2 shadow-lg shadow-emerald-500/20" onClick={confirmNewCustomer}>Confirmar Cliente</button>
               </div>
             </div>
           </div>
         )}
+
     </div>
   );
 };

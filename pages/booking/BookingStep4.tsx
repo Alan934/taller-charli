@@ -124,8 +124,14 @@ const BookingStep4: React.FC = () => {
   const selectedText = useMemo(() => {
     if (!scheduledAt) return 'Sin seleccionar';
     const d = new Date(scheduledAt);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-  }, [scheduledAt]);
+    const startStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    
+    const duration = durationMinutes || 60;
+    const endD = new Date(d.getTime() + duration * 60000);
+    const endStr = endD.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    return `${d.toLocaleDateString()} ${startStr} - ${endStr}`;
+  }, [scheduledAt, durationMinutes]);
 
   const monthLabel = useMemo(() => {
     const d = new Date(Date.UTC(yearMonth.year, yearMonth.monthIndex, 15, 12));
@@ -310,19 +316,19 @@ const BookingStep4: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0f1720]">
       <BookingHeader title="Agenda tu cita" step={3} onBack={() => navigate('/dashboard')} />
 
       <main className="max-w-5xl mx-auto px-6 py-10">
         {redirectingToStep1 && (
-          <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 px-4 py-3 text-amber-800 dark:text-amber-200 shadow-sm">
             <span className="material-symbols-outlined mt-0.5">error</span>
             <div>
               <p className="font-semibold text-sm">Paso 1: Falta asignar cliente</p>
               <p className="text-sm">Volvemos al Paso 1 para que completes o selecciones el cliente.</p>
               <button
                 type="button"
-                className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:underline"
                 onClick={() => navigate('/book/step1')}
               >
                 Ir ahora
@@ -333,23 +339,23 @@ const BookingStep4: React.FC = () => {
         )}
 
         <div className="grid lg:grid-cols-[1fr,320px] gap-8">
-          <section className="bg-white rounded-2xl shadow-sm p-6">
+          <section className="bg-white dark:bg-[#1e293b] rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6">
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg font-semibold">3</div>
+              <div className="w-11 h-11 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center text-lg font-bold">3</div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Selecciona fecha y hora</h2>
-                <p className="text-gray-500">Disponibilidad próxima</p>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Selecciona fecha y hora</h2>
+                <p className="text-slate-500 dark:text-slate-400">Disponibilidad próxima</p>
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-gray-50 rounded-2xl p-4">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-sm text-gray-500">Mes</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Mes</p>
                     <div className="flex items-center gap-2">
                       <button
-                        className="h-9 w-9 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                        className="h-9 w-9 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40"
                         onClick={() =>
                           setYearMonth((prev) => {
                             const candidateMonth = prev.monthIndex - 1;
@@ -371,11 +377,11 @@ const BookingStep4: React.FC = () => {
                       >
                         ‹
                       </button>
-                      <p className="text-base font-semibold text-gray-900">
+                      <p className="text-base font-bold text-slate-900 dark:text-white">
                         {monthLabel}
                       </p>
                       <button
-                        className="h-9 w-9 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                        className="h-9 w-9 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() =>
                           setYearMonth((prev) => {
                             const candidateMonth = prev.monthIndex + 1;
@@ -391,11 +397,11 @@ const BookingStep4: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-500">Turnos para {date}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Turnos para {date}</p>
                   </div>
                 </div>
 
-                <div className="mb-2 grid grid-cols-7 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <div className="mb-2 grid grid-cols-7 text-xs font-bold text-slate-400 uppercase tracking-wide">
                   {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => (
                     <span key={d} className="text-center py-2">
                       {d}
@@ -422,7 +428,7 @@ const BookingStep4: React.FC = () => {
                           setDate(day.iso!);
                           setScheduledAt('');
                         }}
-                        className={`relative h-16 rounded-xl border text-sm transition-all flex flex-col items-center justify-center gap-1 ${
+                        className={`relative w-full aspect-square rounded-xl border text-sm transition-all flex flex-col items-center justify-center gap-1 ${
                               isSelected
                                 ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                                 : disabled
@@ -568,33 +574,33 @@ const BookingStep4: React.FC = () => {
                 {/* End Selection Logic */}
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/50 rounded-2xl p-6 border border-emerald-100 shadow-sm">
+              <div className="bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/50 dark:from-emerald-900/20 dark:via-slate-800 dark:to-blue-900/10 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-900/30 shadow-sm">
                 <div className="flex items-start gap-4 mb-5">
-                  <div className="w-10 h-10 rounded-full bg-white flex flex-shrink-0 items-center justify-center shadow-sm border border-emerald-100">
-                    <span className="material-symbols-outlined text-emerald-500">campaign</span>
+                  <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 flex flex-shrink-0 items-center justify-center shadow-sm border border-emerald-100 dark:border-slate-600">
+                    <span className="material-symbols-outlined text-emerald-500 dark:text-emerald-400">campaign</span>
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-emerald-800 uppercase tracking-wide mb-1">Recordatorio</p>
-                    <p className="text-sm text-gray-600 leading-relaxed">
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide mb-1">Recordatorio</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
                       Un asesor confirmará tu cita a la brevedad. Recibirás una notificación y un correo cuando tu turno esté confirmado.
                     </p>
                   </div>
                 </div>
-                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
+                <div className="bg-white dark:bg-[#1a2632] rounded-xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 space-y-3">
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Horario seleccionado</p>
-                    <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                         {selectedText === 'Sin seleccionar' ? '--/--/--' : selectedText}
                     </p>
                   </div>
-                  <div className="flex gap-4 pt-2 border-t border-gray-50">
+                  <div className="flex gap-4 pt-2 border-t border-gray-50 dark:border-slate-700">
                     <div>
                         <p className="text-xs text-gray-400">Duración</p>
-                        <p className="font-semibold text-gray-700">{formatDurationLabel(durationMinutes)}</p>
+                        <p className="font-semibold text-gray-700 dark:text-slate-200">{formatDurationLabel(durationMinutes)}</p>
                     </div>
                     <div>
                         <p className="text-xs text-gray-400">Zona Horaria</p>
-                        <p className="font-semibold text-gray-700">Mendoza (GMT-3)</p>
+                        <p className="font-semibold text-gray-700 dark:text-slate-200">Mendoza (GMT-3)</p>
                     </div>
                   </div>
                 </div>
@@ -602,46 +608,46 @@ const BookingStep4: React.FC = () => {
             </div>
           </section>
 
-          <aside className="bg-white rounded-2xl shadow-sm p-6 h-fit">
+          <aside className="bg-white dark:bg-[#1e293b] rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 h-fit sticky top-24">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center font-semibold">✓</div>
+              <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center font-bold">✓</div>
               <div>
-                <p className="text-sm text-gray-500">Paso 3 de 3</p>
-                <p className="text-lg font-semibold text-gray-900">Revisión final (Verificar los datos del turno si son correctos)</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Paso 3 de 3</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Revisión final</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-sm text-gray-700">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">Servicio</span>
-                <span className="font-medium text-gray-900">Diagnóstico</span>
+            <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Servicio</span>
+                <span className="font-bold text-slate-900 dark:text-white text-right">Diagnóstico</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Tipo</span>
+                <span className="font-bold text-slate-900 dark:text-white text-right">{assetType === 'VEHICLE' ? 'Vehículo' : 'Repuesto'}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Fecha</span>
+                <span className="font-bold text-slate-900 dark:text-white text-right break-words max-w-[60%]">{selectedText}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500">Tipo</span>
-                <span className="font-medium text-gray-900">{assetType === 'VEHICLE' ? 'Vehículo' : 'Repuesto'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">Fecha</span>
-                <span className="font-medium text-gray-900">{selectedText}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">Duración</span>
-                <span className="font-medium text-gray-900">{formatDurationLabel(durationMinutes)}</span>
+                <span className="text-slate-500 dark:text-slate-400">Duración</span>
+                <span className="font-bold text-slate-900 dark:text-white text-right">{formatDurationLabel(durationMinutes)}</span>
               </div>
             </div>
 
             {localError && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 text-red-700 dark:text-red-200 text-sm px-4 py-3 animate-pulse">
                 {localError}
               </div>
             )}
 
             <button
-              className="w-full mt-6 h-12 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-colors shadow-sm"
+              className="w-full mt-6 h-14 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-lg"
               onClick={confirm}
               disabled={!scheduledAt || submitting}
             >
-              {submitting ? 'Confirmando...' : 'Confirmar reserva'}
+              {submitting ? 'Confirmando...' : 'Confirmar Reserva'}
             </button>
           </aside>
         </div>

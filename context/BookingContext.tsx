@@ -385,7 +385,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       assetType: state.assetType,
       customerId,
       createCustomer,
-      vehicleId: state.assetType === 'VEHICLE' ? existingVehicleId : undefined,
+      existingVehicleId: state.assetType === 'VEHICLE' ? existingVehicleId : undefined,
       vehicle: state.assetType === 'VEHICLE' && !state.existingVehicleId ? state.vehicle : undefined,
       part: state.assetType === 'PART' ? state.part : undefined,
       commonIssueIds: state.commonIssueIds,
