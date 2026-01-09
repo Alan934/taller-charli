@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NotificationsDropdown } from '../components/NotificationsDropdown';
 
 const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -120,9 +121,12 @@ const DashboardLayout: React.FC = () => {
               <span className="material-symbols-outlined text-primary">electric_bolt</span>
               <span className="font-bold text-lg text-[#111518] dark:text-white">Taller Charli</span>
            </div>
-           <button className="text-[#111518] dark:text-white" onClick={() => setMobileOpen((v) => !v)} aria-label="Abrir menú">
-              <span className="material-symbols-outlined">menu</span>
-           </button>
+           <div className="flex items-center gap-2">
+             <NotificationsDropdown />
+             <button className="text-[#111518] dark:text-white" onClick={() => setMobileOpen((v) => !v)} aria-label="Abrir menú">
+                <span className="material-symbols-outlined">menu</span>
+             </button>
+           </div>
         </div>
 
         {mobileOpen && (
@@ -151,6 +155,11 @@ const DashboardLayout: React.FC = () => {
             <div className="flex-1" onClick={closeMobile} />
           </div>
         )}
+
+        {/* Desktop Header for Notifications */}
+        <div className="hidden md:flex justify-end items-center px-8 py-4 bg-transparent absolute top-0 right-0 z-30">
+           <NotificationsDropdown />
+        </div>
         
         <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 scroll-smooth">
            <Outlet />
@@ -159,5 +168,6 @@ const DashboardLayout: React.FC = () => {
     </div>
   );
 };
+
 
 export default DashboardLayout;

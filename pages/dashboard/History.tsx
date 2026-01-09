@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingApi } from '../../services/booking';
 import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus } from '../../types/booking';
@@ -7,6 +7,7 @@ import type { AssetType } from '../../types/enums';
 
 const History: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { token, user } = useAuth();
     const [bookings, setBookings] = useState<BookingItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -21,10 +22,20 @@ const History: React.FC = () => {
         if (!token) return;
         setLoading(true);
         (user?.role === 'ADMIN' ? bookingApi.listAll(token) : bookingApi.listMine(token))
-            .then(setBookings)
+            .then((data) => {
+                setBookings(data);
+                // Highlight logic if coming from notification
+                const state = location.state as { highlightId?: number } | null;
+                if (state?.highlightId) {
+                    const found = data.find(b => b.id === state.highlightId);
+                    if (found) {
+                        setQuery(found.code); // Filter by code to show it
+                    }
+                }
+            })
             .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar historial'))
             .finally(() => setLoading(false));
-    }, [token, user?.role]);
+    }, [token, user?.role, location.state]);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();

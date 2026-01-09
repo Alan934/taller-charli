@@ -32,5 +32,9 @@ export const vehiclesApi = {
 
     deleteMyVehicle: (id: number, token: string) => {
         return request<{ success: true }>(`/users/me/vehicles/${id}`, { token, method: 'DELETE' });
+    },
+
+    deleteVehicleAsAdmin: (clientId: number, vehicleId: number, token: string) => {
+        return request<{ success: boolean }>(`/users/${clientId}/vehicles/${vehicleId}`, { method: 'DELETE', token });
     }
 };

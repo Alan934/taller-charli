@@ -101,10 +101,15 @@ export default function MyVehicles() {
     const executeDelete = async () => {
         if (!vehicleToDelete) return;
         try {
-            await vehiclesApi.deleteMyVehicle(vehicleToDelete.id, token!);
+            if (isAdmin && vehicleToDelete.owner?.id) {
+                await vehiclesApi.deleteVehicleAsAdmin(vehicleToDelete.owner.id, vehicleToDelete.id, token!);
+            } else {
+                await vehiclesApi.deleteMyVehicle(vehicleToDelete.id, token!);
+            }
             setVehicleToDelete(null);
             fetchData();
         } catch (err) {
+            console.error(err);
             alert('Error al eliminar');
         }
     };
