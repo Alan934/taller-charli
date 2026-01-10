@@ -137,9 +137,9 @@ const AdminSettings: React.FC = () => {
           startTime: d.startTime,
           endTime: d.endTime,
           isActive: d.isActive,
-          maxBookings: Number(d.maxBookings) || 1,
+          maxBookings: Number(d.maxBookings) >= 0 ? Number(d.maxBookings) : 1, // Ensure non-negative
         })),
-        overrides: overrides.map((o) => ({ date: o.date, maxBookings: Number(o.maxBookings) || 1 })),
+        overrides: overrides.map((o) => ({ date: o.date, maxBookings: Number(o.maxBookings) })), // Allow 0
       };
       const saved = await bookingApi.saveWorkdays(payload, token);
       setWorkdays(saved.workdays);
@@ -153,7 +153,7 @@ const AdminSettings: React.FC = () => {
   };
 
   const addOverride = () => {
-    if (!newOverride.date || !newOverride.maxBookings) return;
+    if (!newOverride.date || newOverride.maxBookings === undefined || newOverride.maxBookings < 0) return;
     setOverrides((prev) => {
       const existing = prev.find((o) => o.date === newOverride.date);
       if (existing) {
@@ -161,7 +161,7 @@ const AdminSettings: React.FC = () => {
       }
       return [...prev, newOverride];
     });
-    setNewOverride({ date: '', maxBookings: 4 });
+    setNewOverride({ date: '', maxBookings: 0 }); // Default to 0 (Holiday) for convenience
   };
 
   const removeOverride = (date: string) => {
@@ -518,14 +518,14 @@ const AdminSettings: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 mb-1 block">Cupos Habilitados</label>
+                                <label className="text-xs font-bold text-gray-500 mb-1 block">Cupos Habilitados (0 = Cerrado)</label>
                                 <input
                                     type="number"
                                     min={0}
                                     value={newOverride.maxBookings}
                                     onChange={(e) => setNewOverride((prev) => ({ ...prev, maxBookings: Number(e.target.value) }))}
                                     className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-primary transition-colors"
-                                    placeholder="Ej. 0 para feriado"
+                                    placeholder="0 para cerrar el día"
                                 />
                             </div>
                             <button
@@ -546,12 +546,18 @@ const AdminSettings: React.FC = () => {
                                 {overrides.map((o) => (
                                     <div key={o.date} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
-                                                {new Date(o.date).getDate()}
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${
+                                                o.maxBookings === 0 
+                                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                                                : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                            }`}>
+                                                {o.date.split('-')[2]}
                                             </div>
                                             <div>
                                                 <p className="font-bold text-gray-900 dark:text-white text-sm">{o.date}</p>
-                                                <p className="text-xs text-gray-500">{o.maxBookings} cupos hab.</p>
+                                                <p className={`text-xs ${o.maxBookings === 0 ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
+                                                    {o.maxBookings === 0 ? 'CERRADO (Feriado)' : `${o.maxBookings} cupos hab.`}
+                                                </p>
                                             </div>
                                         </div>
                                         <button
