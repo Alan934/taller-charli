@@ -5,6 +5,17 @@ import { BookingTimeType } from '../../types/enums';
 import { useBooking } from '../../context/BookingContext';
 import { formatDurationLabel } from '../../lib/formatDuration';
 
+const getFriendlyErrorMessage = (msg: string): string => {
+  const map: Record<string, string> = {
+    'Alguna falla no corresponde a vehículos': 'Una de las fallas seleccionadas (ej. relacionada a partes específicas) no es válida para un vehículo completo.',
+    'Alguna falla seleccionada no existe': 'Una de las fallas seleccionadas ya no está disponible.',
+    'Vehículo inválido para el cliente': 'El vehículo seleccionado no corresponde al cliente actual.',
+    'Datos del vehículo requeridos': 'Falta información necesaria del vehículo.',
+    'Alguna falla no corresponde a la categoría de la pieza seleccionada': 'La falla no coincide con el tipo de pieza elegida.',
+  };
+  return map[msg] || msg;
+};
+
 const BookingStep4: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -293,22 +304,27 @@ const BookingStep4: React.FC = () => {
       await submitBooking();
       navigate('/book/success');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo crear el turno';
-      const missingCustomer = message.toLowerCase().includes('selecciona un cliente existente o crea uno nuevo');
+      const originalMessage = err instanceof Error ? err.message : 'No se pudo crear el turno';
+      const friendlyMessage = getFriendlyErrorMessage(originalMessage);
+      
+      const missingCustomer = originalMessage.toLowerCase().includes('selecciona un cliente existente o crea uno nuevo') 
+        || originalMessage.toLowerCase().includes('cliente no encontrado');
+
       console.log('[booking-confirm-error]', {
-        message,
+        message: originalMessage,
         assetType,
         customerId,
         createCustomer: !!createCustomer,
         existingVehicleId,
         hasVehicle: !!vehicle,
       });
+
       if (missingCustomer) {
         setLocalError('Paso 1: Falta asignar el cliente. Te llevamos al Paso 1 para completarlo.');
         setRedirectingToStep1(true);
         redirectTimer.current = setTimeout(() => navigate('/book/step1'), 1300);
       } else {
-        setLocalError(message);
+        setLocalError(friendlyMessage);
       }
     } finally {
       setSubmitting(false);
@@ -637,8 +653,12 @@ const BookingStep4: React.FC = () => {
             </div>
 
             {localError && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 text-red-700 dark:text-red-200 text-sm px-4 py-3 animate-pulse">
-                {localError}
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 flex gap-3 animate-pulse shadow-sm">
+                <span className="material-symbols-outlined text-red-600 dark:text-red-400 shrink-0">error</span>
+                <div>
+                  <h3 className="font-bold text-red-800 dark:text-red-300 text-sm mb-1">No se pudo confirmar</h3>
+                  <p className="text-red-700 dark:text-red-200 text-sm leading-relaxed">{localError}</p>
+                </div>
               </div>
             )}
 
