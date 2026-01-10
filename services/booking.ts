@@ -32,6 +32,8 @@ export const bookingApi = {
     data: Partial<Omit<Issue, 'id'>> & { partCategoryId?: number },
     token: string,
   ) => request<Issue>(`/issues/${id}`, { token, method: 'PATCH', body: data }),
+  deleteIssue: (id: number, token: string) =>
+    request<{ success: true }>(`/issues/${id}`, { token, method: 'DELETE' }),
   listPartCategories: (token: string) => request<PartCategory[]>('/part-categories', { token }),
   createPartCategory: (data: { code: string; name: string }, token: string) =>
     request<PartCategory>('/part-categories', { token, body: data }),
@@ -91,5 +93,7 @@ export const bookingApi = {
     request<BookingItem>(`/bookings/${id}/repair-notes`, { method: 'PATCH', body: { repairNotes }, token }),
   getBookingsByVehicle: (vehicleId: number, token: string) =>
     request<BookingItem[]>(`/bookings/vehicle/${vehicleId}`, { token }),
+  getBookingsByPart: (partId: number, token: string) =>
+    request<BookingItem[]>(`/bookings/part/${partId}`, { token }),
 };
 

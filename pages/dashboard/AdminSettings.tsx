@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { bookingApi } from '../../services/booking';
 import { useAuth } from '../../context/AuthContext';
+import Loading from '../../components/Loading';
 import {
   Issue,
   PartCategory,
@@ -49,6 +50,13 @@ const AdminSettings: React.FC = () => {
   const [newCategory, setNewCategory] = useState({ code: '', name: '' });
   const [newBrand, setNewBrand] = useState({ name: '' });
   const [newIssue, setNewIssue] = useState({ label: '', durationMinutes: 30, partCategoryId: '' });
+
+  // States for Editing
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryData, setEditingCategoryData] = useState({ code: '', name: '' });
+
+  const [editingIssueId, setEditingIssueId] = useState<number | null>(null);
+  const [editingIssueData, setEditingIssueData] = useState({ label: '', durationMinutes: 30, partCategoryId: '' });
 
   useEffect(() => {
     if (!token || user?.role !== 'ADMIN') return;
@@ -257,383 +265,548 @@ const AdminSettings: React.FC = () => {
     }
   };
 
+  const handleDeleteIssue = async (id: number) => {
+    if (!token) return;
+    try {
+      await bookingApi.deleteIssue(id, token);
+      setIssues((prev) => prev.filter((i) => i.id !== id));
+      setMessage('Falla eliminada');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la falla');
+    }
+  };
+
+  // --- Editing Helpers ---
+
+  const startEditingCategory = (cat: PartCategory) => {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryData({ code: cat.code, name: cat.name });
+  };
+
+  const cancelEditingCategory = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryData({ code: '', name: '' });
+  };
+
+  const saveEditingCategory = async () => {
+    if (!editingCategoryId) return;
+    await handleUpdateCategory(editingCategoryId, editingCategoryData);
+    setEditingCategoryId(null);
+  };
+
+  const startEditingIssue = (issue: Issue) => {
+    setEditingIssueId(issue.id);
+    setEditingIssueData({
+      label: issue.label,
+      durationMinutes: issue.durationMinutes,
+      partCategoryId: issue.partCategory?.id ? String(issue.partCategory.id) : '',
+    });
+  };
+
+  const cancelEditingIssue = () => {
+    setEditingIssueId(null);
+    setEditingIssueData({ label: '', durationMinutes: 30, partCategoryId: '' });
+  };
+
+  const saveEditingIssue = async (originalIssue: Issue) => {
+    if (!editingIssueId) return;
+    await handleUpdateIssue(originalIssue, {
+      label: editingIssueData.label,
+      durationMinutes: Number(editingIssueData.durationMinutes),
+      partCategoryId: editingIssueData.partCategoryId ? Number(editingIssueData.partCategoryId) : undefined,
+    });
+    setEditingIssueId(null);
+  };
+
   if (user?.role !== 'ADMIN') {
-    return <p className="text-sm text-red-600">Solo los administradores pueden acceder a esta sección.</p>;
+    return (
+        <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-6 py-4 rounded-2xl font-bold flex items-center gap-3">
+                <span className="material-symbols-outlined">gpp_bad</span>
+                Acceso denegado: Solo administradores.
+            </div>
+        </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-1">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Administración</p>
-        <h1 className="text-2xl md:text-3xl font-bold">Horarios y catálogos</h1>
-        <p className="text-sm text-[#617989]">Gestioná disponibilidad, marcas y fallas comunes.</p>
-      </header>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in font-sans pb-24">
+      {/* Header */}
+      <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+            <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight leading-tight">
+            Configuración del Taller
+            </h1>
+            <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
+            Gestiona los horarios de atención, excepciones y catálogos del sistema.
+            </p>
+        </div>
+      </div>
 
       {(error || message) && (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm border ${
-            error ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-          }`}
-        >
-          {error ?? message}
+        <div className={`mb-8 p-4 rounded-2xl flex items-center gap-3 shadow-sm border ${
+             error 
+                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/50' 
+                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50'
+        }`}>
+            <span className="material-symbols-outlined text-[24px]">{error ? 'error' : 'check_circle'}</span>
+            <p className="font-medium text-sm md:text-base">{error ?? message}</p>
         </div>
       )}
 
       {loading ? (
-        <p className="text-sm text-[#617989]">Cargando...</p>
+        <div className="flex justify-center items-center py-32"><Loading /></div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <section className="xl:col-span-2 bg-white dark:bg-surface-dark border border-[#dbe1e6] dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Horarios y días de trabajo</h2>
-                <p className="text-sm text-[#617989]">Turnos por franja. Días activos: {activeDays}/7</p>
-              </div>
-              <button
-                onClick={handleSaveSchedule}
-                disabled={savingSchedule}
-                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold shadow disabled:opacity-50"
-              >
-                {savingSchedule ? 'Guardando...' : 'Guardar horarios'}
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {weekdayLabels.map((label, weekday) => {
-                const segments = workdays.filter((w) => w.weekday === weekday);
-                return (
-                  <div key={label} className="rounded-xl border border-[#eef2f6] dark:border-gray-800 p-4 bg-gradient-to-br from-white to-[#f8fbff] dark:from-surface-dark dark:to-[#0f172a]">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-[#111518]">{label}</span>
-                        <span className="text-[11px] px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold">{segments.length} turno{segments.length === 1 ? '' : 's'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-[#617989]">
-                        <input
-                          type="checkbox"
-                          checked={segments.some((s) => s.isActive)}
-                          onChange={(e) => segments.forEach((_, idx) => updateSegment(weekday, idx, 'isActive', e.target.checked))}
-                          className="size-4 accent-primary"
-                          aria-label={`Activar ${label}`}
-                        />
-                        <span>{segments.some((s) => s.isActive) ? 'Activo' : 'Inactivo'}</span>
-                      </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          
+          {/* Main Column: Scheduler */}
+          <div className="xl:col-span-2 space-y-8">
+            <section className="bg-white dark:bg-[#1a2632] rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[28px]">calendar_month</span>
+                        Jornada Laboral
+                        </h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">Configura las franjas horarias por día.</p>
                     </div>
+                    <button
+                        onClick={handleSaveSchedule}
+                        disabled={savingSchedule}
+                        className="group relative flex items-center gap-2 px-6 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold transition-all disabled:opacity-50 shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5"
+                    >
+                        {savingSchedule ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                                <span>Guardando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined">save</span>
+                                <span>Guardar Cambios</span>
+                            </>
+                        )}
+                    </button>
+                </div>
 
-                    <div className="flex flex-col gap-3">
-                      {segments.length === 0 && (
-                        <p className="text-sm text-[#617989]">Sin franjas. Agregá un turno.</p>
-                      )}
-
-                      {segments.map((seg, idx) => (
-                        <div key={`${label}-${idx}`} className="rounded-lg border border-[#dbe1e6] dark:border-gray-800 bg-white dark:bg-surface-dark px-3 py-3 shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-[#617989]">Turno {idx + 1}</span>
-                            {segments.length > 1 && (
-                              <button
-                                onClick={() => removeSegment(weekday, idx)}
-                                className="text-[11px] font-semibold text-red-600 hover:text-red-700"
-                              >
-                                Quitar
-                              </button>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <label className="flex flex-col gap-1 text-[#617989]">
-                              <span className="text-[11px] uppercase tracking-wide">Inicio</span>
-                              <input
-                                type="time"
-                                value={seg.startTime}
-                                onChange={(e) => updateSegment(weekday, idx, 'startTime', e.target.value)}
-                                className="rounded-lg border border-[#dbe1e6] px-2 py-2"
-                              />
+                <div className="space-y-4">
+                {weekdayLabels.map((label, weekday) => {
+                    const segments = workdays.filter((w) => w.weekday === weekday);
+                    const isActiveDay = segments.some((s) => s.isActive);
+                    
+                    return (
+                    <div key={label} className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
+                        isActiveDay 
+                            ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30' 
+                            : 'border-gray-100 dark:border-gray-800 grayscale opacity-80'
+                    }`}>
+                        <div className="px-6 py-4 flex items-center justify-between bg-white/50 dark:bg-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg
+                                    ${isActiveDay ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}
+                                `}>
+                                    {label.substring(0, 1)}
+                                </div>
+                                <span className={`text-lg font-bold ${isActiveDay ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>{label}</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer"
+                                    checked={isActiveDay}
+                                    onChange={(e) => segments.forEach((_, idx) => updateSegment(weekday, idx, 'isActive', e.target.checked))}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                             </label>
-                            <label className="flex flex-col gap-1 text-[#617989]">
-                              <span className="text-[11px] uppercase tracking-wide">Fin</span>
-                              <input
-                                type="time"
-                                value={seg.endTime}
-                                onChange={(e) => updateSegment(weekday, idx, 'endTime', e.target.value)}
-                                className="rounded-lg border border-[#dbe1e6] px-2 py-2"
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1 text-[#617989]">
-                              <span className="text-[11px] uppercase tracking-wide">Cupos</span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={seg.maxBookings}
-                                onChange={(e) => updateSegment(weekday, idx, 'maxBookings', Number(e.target.value))}
-                                className="rounded-lg border border-[#dbe1e6] px-2 py-2"
-                              />
-                            </label>
-                            <label className="flex items-center gap-2 text-[#111518] font-semibold">
-                              <input
-                                type="checkbox"
-                                checked={seg.isActive}
-                                onChange={(e) => updateSegment(weekday, idx, 'isActive', e.target.checked)}
-                                className="size-4 accent-primary"
-                              />
-                              Activo
-                            </label>
-                          </div>
                         </div>
-                      ))}
-
-                      <button
-                        onClick={() => addSegment(weekday)}
-                        className="w-full mt-1 rounded-lg border border-dashed border-primary/50 text-primary text-sm font-semibold py-2 hover:bg-primary/5"
-                      >
-                        Agregar turno
-                      </button>
+                        
+                        {isActiveDay && (
+                            <div className="p-4 sm:p-6 grid gap-4">
+                                {segments.length === 0 ? (
+                                    <div className="text-center py-4 text-gray-500 text-sm">Sin turnos asignados</div>
+                                ) : (
+                                    segments.map((seg, idx) => (
+                                        <div key={`${label}-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end bg-white dark:bg-[#15202b] p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                                            <div className="sm:col-span-1 flex items-center justify-center h-full">
+                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                                                    T{idx + 1}
+                                                </span>
+                                            </div>
+                                            <div className="sm:col-span-3">
+                                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1 block">Inicio</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="time"
+                                                        value={seg.startTime}
+                                                        onChange={(e) => updateSegment(weekday, idx, 'startTime', e.target.value)}
+                                                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-mono text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                                    />
+                                                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">schedule</span>
+                                                </div>
+                                            </div>
+                                            <div className="sm:col-span-3">
+                                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1 block">Fin</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="time"
+                                                        value={seg.endTime}
+                                                        onChange={(e) => updateSegment(weekday, idx, 'endTime', e.target.value)}
+                                                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-mono text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                                    />
+                                                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">schedule</span>
+                                                </div>
+                                            </div>
+                                            <div className="sm:col-span-3">
+                                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1 block">Cupos</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        value={seg.maxBookings}
+                                                        onChange={(e) => updateSegment(weekday, idx, 'maxBookings', Number(e.target.value))}
+                                                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-sans text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                                    />
+                                                    <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">group</span>
+                                                </div>
+                                            </div>
+                                            <div className="sm:col-span-2 flex justify-end">
+                                                {segments.length > 1 && (
+                                                    <button
+                                                        onClick={() => removeSegment(weekday, idx)}
+                                                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                                                        title="Eliminar turno"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                                <button
+                                    onClick={() => addSegment(weekday)}
+                                    className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary/50 text-gray-500 hover:text-primary dark:text-gray-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined">add</span>
+                                    Agregar Turno Extra
+                                </button>
+                            </div>
+                        )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold">Excepciones / cupos especiales</h3>
-                <p className="text-xs text-[#617989]">Aplican a una fecha puntual</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                {overrides.length === 0 && <p className="text-sm text-[#617989]">No hay excepciones.</p>}
-                {overrides.map((o) => (
-                  <div key={o.date} className="flex flex-wrap items-center gap-3 border border-[#dbe1e6] rounded-lg p-3">
-                    <span className="text-sm font-medium">{o.date}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={o.maxBookings}
-                      onChange={(e) =>
-                        setOverrides((prev) =>
-                          prev.map((item) =>
-                            item.date === o.date ? { ...item, maxBookings: Number(e.target.value) } : item,
-                          ),
-                        )
-                      }
-                      className="w-24 rounded-lg border border-[#dbe1e6] px-2 py-1 text-sm"
-                    />
-                    <button
-                      onClick={() => removeOverride(o.date)}
-                      className="text-xs font-semibold text-red-600 hover:text-red-700"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                ))}
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="date"
-                    value={newOverride.date}
-                    onChange={(e) => setNewOverride((prev) => ({ ...prev, date: e.target.value }))}
-                    className="rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={newOverride.maxBookings}
-                    onChange={(e) => setNewOverride((prev) => ({ ...prev, maxBookings: Number(e.target.value) }))}
-                    className="w-24 rounded-lg border border-[#dbe1e6] px-2 py-2 text-sm"
-                  />
-                  <button
-                    onClick={addOverride}
-                    className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold shadow"
-                  >
-                    Agregar fecha
-                  </button>
+                    );
+                })}
                 </div>
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="bg-white dark:bg-surface-dark border border-[#dbe1e6] dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col gap-6">
-            <div>
-              <h2 className="text-lg font-semibold">Marcas de vehículos</h2>
-              <p className="text-sm text-[#617989]">Alta, edición y eliminación.</p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {brands.map((brand) => (
-                  <div
-                    key={brand.id}
-                    className="group inline-flex items-center gap-2 px-3 py-2 rounded-full border border-[#dbe1e6] bg-white dark:bg-surface-dark shadow-sm hover:-translate-y-0.5 hover:shadow transition-all duration-150"
-                  >
-                    <input
-                      className="w-28 sm:w-32 bg-transparent text-sm font-semibold text-[#111518] dark:text-white outline-none"
-                      defaultValue={brand.name}
-                      onBlur={(e) => {
-                        const next = e.target.value.trim();
-                        if (next && next !== brand.name) handleUpdateBrand(brand.id, next);
-                      }}
-                    />
-                    <button
-                      onClick={() => handleDeleteBrand(brand.id)}
-                      className="text-xs text-red-500 opacity-70 group-hover:opacity-100 hover:text-red-600"
-                      aria-label={`Eliminar ${brand.name}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                <input
-                  type="text"
-                  value={newBrand.name}
-                  onChange={(e) => setNewBrand({ name: e.target.value })}
-                  placeholder="Nueva marca"
-                  className="flex-1 rounded-full border border-[#dbe1e6] px-3 py-2 text-sm shadow-sm"
-                />
-                <button onClick={handleCreateBrand} className="px-4 py-2 rounded-full bg-primary text-white text-sm font-semibold shadow self-start sm:self-auto">
-                  Agregar
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold">Categorías de repuestos</h2>
-              <p className="text-sm text-[#617989]">Organizá piezas y repuestos.</p>
-              <div className="flex flex-col gap-3 mt-3">
-                {partCategories.map((cat) => (
-                  <div key={cat.id} className="flex flex-wrap items-center gap-3 border border-[#dbe1e6] rounded-lg p-3">
-                    <input
-                      className="w-28 rounded-lg border border-[#dbe1e6] px-2 py-1 text-sm"
-                      defaultValue={cat.code}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        if (val && val !== cat.code) handleUpdateCategory(cat.id, { code: val });
-                      }}
-                    />
-                    <input
-                      className="flex-1 min-w-[180px] rounded-lg border border-[#dbe1e6] px-2 py-1 text-sm"
-                      defaultValue={cat.name}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        if (val && val !== cat.name) handleUpdateCategory(cat.id, { name: val });
-                      }}
-                    />
-                    <button
-                      onClick={() => handleDeleteCategory(cat.id)}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <input
-                  type="text"
-                  value={newCategory.code}
-                  onChange={(e) => setNewCategory((prev) => ({ ...prev, code: e.target.value }))}
-                  placeholder="Código"
-                  className="w-32 rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                />
-                <input
-                  type="text"
-                  value={newCategory.name}
-                  onChange={(e) => setNewCategory((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nombre"
-                  className="flex-1 min-w-[180px] rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                />
-                <button onClick={handleCreateCategory} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold">
-                  Agregar
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold">Fallas comunes</h2>
-              <p className="text-sm text-[#617989]">Ajustá descripciones y demoras.</p>
-              <div className="flex flex-col gap-3 mt-3">
-                {issues.map((issue) => (
-                  <div key={issue.id} className="flex flex-col gap-3 border border-[#dbe1e6] rounded-lg p-3">
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <input
-                        className="flex-1 min-w-[200px] rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                        defaultValue={issue.label}
-                        onBlur={(e) => {
-                          const next = e.target.value.trim();
-                          if (next && next !== issue.label) handleUpdateIssue(issue, { label: next });
-                        }}
-                      />
-                      <input
-                        type="number"
-                        min={5}
-                        className="w-24 rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                        defaultValue={issue.durationMinutes ?? 30}
-                        onBlur={(e) => {
-                          const val = Number(e.target.value);
-                          if (val && val !== issue.durationMinutes) handleUpdateIssue(issue, { durationMinutes: val });
-                        }}
-                      />
-                      <select
-                        className="min-w-[180px] rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                        defaultValue={issue.partCategory?.id ?? ''}
-                        onChange={(e) =>
-                          handleUpdateIssue(issue, {
-                            partCategoryId: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                      >
-                        <option value="">Todas</option>
-                        {partCategories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
-                      {issue.partCategory ? (
-                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-[#eef2f6] text-[#111518] border border-[#dbe1e6]">
-                          {issue.partCategory.name}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[#617989]">Aplica a vehículos</span>
-                      )}
+             <section className="bg-white dark:bg-[#1a2632] rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-6">
+                    <span className="material-symbols-outlined text-orange-500 text-[28px]">event_busy</span>
+                    Excepciones y Feriados
+                </h2>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-gray-50 dark:bg-gray-800/20 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase mb-4">Nueva Excepción</h3>
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 mb-1 block">Fecha</label>
+                                <input
+                                    type="date"
+                                    value={newOverride.date}
+                                    onChange={(e) => setNewOverride((prev) => ({ ...prev, date: e.target.value }))}
+                                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-primary transition-colors"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 mb-1 block">Cupos Habilitados</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={newOverride.maxBookings}
+                                    onChange={(e) => setNewOverride((prev) => ({ ...prev, maxBookings: Number(e.target.value) }))}
+                                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-primary transition-colors"
+                                    placeholder="Ej. 0 para feriado"
+                                />
+                            </div>
+                            <button
+                                onClick={addOverride}
+                                className="w-full py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold hover:opacity-90 transition-opacity"
+                            >
+                                Agregar Excepción
+                            </button>
+                        </div>
                     </div>
-                  </div>
-                ))}
-              </div>
 
-              <div className="flex flex-col gap-3 mt-3 border border-dashed border-[#dbe1e6] rounded-lg p-3">
-                <p className="text-sm font-semibold">Nueva falla</p>
-                <div className="flex flex-wrap gap-3 items-center">
-                  <input
-                    type="text"
-                    value={newIssue.label}
-                    onChange={(e) => setNewIssue((prev) => ({ ...prev, label: e.target.value }))}
-                    placeholder="Descripción"
-                    className="flex-1 min-w-[200px] rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={5}
-                    value={newIssue.durationMinutes}
-                    onChange={(e) => setNewIssue((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
-                    className="w-24 rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                  />
-                  <select
-                    value={newIssue.partCategoryId}
-                    onChange={(e) => setNewIssue((prev) => ({ ...prev, partCategoryId: e.target.value }))}
-                    className="min-w-[180px] rounded-lg border border-[#dbe1e6] px-3 py-2 text-sm"
-                  >
-                    <option value="">Todas</option>
-                    {partCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
+                    <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase mb-1">Días Configurados</h3>
+                        {overrides.length === 0 ? (
+                            <p className="text-gray-500 text-sm italic">No hay excepciones registradas.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {overrides.map((o) => (
+                                    <div key={o.date} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
+                                                {new Date(o.date).getDate()}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 dark:text-white text-sm">{o.date}</p>
+                                                <p className="text-xs text-gray-500">{o.maxBookings} cupos hab.</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => removeOverride(o.date)}
+                                            className="w-8 h-8 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 flex items-center justify-center transition-colors"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">close</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+             </section>
+          </div>
+
+          {/* Right Column: Catalogs */}
+          <div className="space-y-8">
+            
+            {/* Brands Widget */}
+            <section className="bg-white dark:bg-[#1a2632] rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-purple-500">directions_car</span>
+                    Marcas
+                </h2>
+                
+                <div className="flex gap-2 mb-6">
+                    <input
+                        type="text"
+                        value={newBrand.name}
+                        onChange={(e) => setNewBrand({ name: e.target.value })}
+                        placeholder="Nueva marca..."
+                        className="flex-1 px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-primary text-sm"
+                    />
+                    <button onClick={handleCreateBrand} className="px-3 rounded-xl bg-purple-500 text-white shadow-lg shadow-purple-500/30 hover:bg-purple-600 transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">add</span>
+                    </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {brands.map((brand) => (
+                        <div key={brand.id} className="group flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all hover:border-purple-300 dark:hover:border-purple-700">
+                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{brand.name}</span>
+                            <button
+                                onClick={() => handleDeleteBrand(brand.id)}
+                                className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 hover:text-red-500 flex items-center justify-center transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[12px]">close</span>
+                            </button>
+                        </div>
                     ))}
-                  </select>
-                  <button onClick={handleCreateIssue} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold">
-                    Crear
-                  </button>
                 </div>
-              </div>
-            </div>
-          </section>
+            </section>
+
+             {/* Categories Widget */}
+             <section className="bg-white dark:bg-[#1a2632] rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-green-500">category</span>
+                    Categorías de Piezas
+                </h2>
+                
+                 <div className="flex flex-col gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                    <input
+                        type="text"
+                        value={newCategory.code}
+                        onChange={(e) => setNewCategory((prev) => ({ ...prev, code: e.target.value }))}
+                        placeholder="Cód (Ej. MOTOR)"
+                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border-none text-sm outline-none"
+                    />
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newCategory.name}
+                            onChange={(e) => setNewCategory((prev) => ({ ...prev, name: e.target.value }))}
+                            placeholder="Nombre Categoría"
+                            className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border-none text-sm outline-none"
+                        />
+                        <button onClick={handleCreateCategory} className="w-10 rounded-lg bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/30 hover:bg-green-600 transition-colors">
+                            <span className="material-symbols-outlined text-[20px]">add</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
+                    {partCategories.map((cat) => (
+                        <div key={cat.id} className="p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 border border-transparent hover:border-gray-100 dark:hover:border-gray-800 transition-all group">
+                            {editingCategoryId === cat.id ? (
+                                <div className="flex flex-col gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm">
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={editingCategoryData.code}
+                                            onChange={(e) => setEditingCategoryData({...editingCategoryData, code: e.target.value})}
+                                            className="w-1/3 px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                            placeholder="Cód"
+                                        />
+                                        <input
+                                            value={editingCategoryData.name}
+                                            onChange={(e) => setEditingCategoryData({...editingCategoryData, name: e.target.value})}
+                                            className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                            placeholder="Nombre"
+                                        />
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                         <button onClick={cancelEditingCategory} className="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
+                                         <button onClick={saveEditingCategory} className="px-2 py-1 text-xs font-bold text-white bg-green-500 hover:bg-green-600 rounded">Guardar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-400 uppercase">{cat.code}</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{cat.name}</p>
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                        <button
+                                            onClick={() => startEditingCategory(cat)}
+                                            className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-1.5 rounded-lg transition-all"
+                                            title="Editar"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteCategory(cat.id)}
+                                            className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-all"
+                                            title="Eliminar"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+             {/* Issues Widget */}
+             <section className="bg-white dark:bg-[#1a2632] rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-pink-500">build_circle</span>
+                    Fallas Comunes
+                </h2>
+
+                <div className="p-4 bg-pink-50 dark:bg-pink-900/10 rounded-2xl mb-4 border border-pink-100 dark:border-pink-900/20">
+                     <p className="text-xs font-bold text-pink-600 dark:text-pink-400 uppercase mb-2">Agregar Falla</p>
+                     <div className="space-y-2">
+                        <input
+                            type="text"
+                            value={newIssue.label}
+                            onChange={(e) => setNewIssue((prev) => ({ ...prev, label: e.target.value }))}
+                            placeholder="Descripción..."
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border-none text-sm outline-none"
+                        />
+                        <div className="flex gap-2">
+                            <div className="w-24 relative">
+                                <input
+                                    type="number"
+                                    min={5}
+                                    value={newIssue.durationMinutes}
+                                    onChange={(e) => setNewIssue((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
+                                    className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border-none text-sm outline-none"
+                                />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold">MIN</span>
+                            </div>
+                             <select
+                                value={newIssue.partCategoryId}
+                                onChange={(e) => setNewIssue((prev) => ({ ...prev, partCategoryId: e.target.value }))}
+                                className="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border-none text-sm outline-none"
+                            >
+                                <option value="">General</option>
+                                {partCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <button onClick={handleCreateIssue} className="w-full py-2 rounded-lg bg-pink-500 text-white font-bold text-sm shadow-md shadow-pink-500/20 hover:bg-pink-600">
+                            Agregar
+                        </button>
+                     </div>
+                </div>
+
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                    {issues.map(issue => (
+                        <div key={issue.id} className="p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 group hover:border-pink-200 dark:hover:border-pink-900 transition-all">
+                            {editingIssueId === issue.id ? (
+                                <div className="space-y-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm">
+                                    <input
+                                        value={editingIssueData.label}
+                                        onChange={(e) => setEditingIssueData({...editingIssueData, label: e.target.value})}
+                                        className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        placeholder="Descripción"
+                                    />
+                                    <div className="flex gap-2">
+                                        <div className="w-20 relative">
+                                            <input
+                                                type="number"
+                                                value={editingIssueData.durationMinutes}
+                                                onChange={(e) => setEditingIssueData({...editingIssueData, durationMinutes: Number(e.target.value)})}
+                                                className="w-full px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                            />
+                                            <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">m</span>
+                                        </div>
+                                        <select
+                                            value={editingIssueData.partCategoryId}
+                                            onChange={(e) => setEditingIssueData({...editingIssueData, partCategoryId: e.target.value})}
+                                            className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="">General</option>
+                                            {partCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        <button onClick={cancelEditingIssue} className="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
+                                        <button onClick={() => saveEditingIssue(issue)} className="px-2 py-1 text-xs font-bold text-white bg-green-500 hover:bg-green-600 rounded">Guardar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between items-start mb-2 gap-2">
+                                        <span className="text-sm font-bold text-gray-800 dark:text-gray-200 line-clamp-2">{issue.label}</span>
+                                        <span className="text-xs font-mono bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 whitespace-nowrap">
+                                            {issue.durationMinutes}m
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            issue.partCategory 
+                                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' 
+                                            : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                        }`}>
+                                            {issue.partCategory?.name || 'General'}
+                                        </span>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => startEditingIssue(issue)}
+                                                className="p-1 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded"
+                                                title="Editar"
+                                            >
+                                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteIssue(issue.id)}
+                                                className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
+                                                title="Eliminar"
+                                            >
+                                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+             </section>
+          </div>
         </div>
       )}
     </div>

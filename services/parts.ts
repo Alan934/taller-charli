@@ -23,6 +23,12 @@ export const partsApi = {
         return request<Part[]>(`/users/${clientId}/parts`, { token });
     },
 
+    // Admin: List ALL parts from ALL clients
+    getAllParts: (token: string, query?: string) => {
+        const search = query ? `?q=${encodeURIComponent(query)}` : '';
+        return request<Part[]>(`/users/parts/all${search}`, { token });
+    },
+
     // Client: List my parts
     listMyParts: (token: string) => {
         return request<Part[]>('/users/me/parts', { token });

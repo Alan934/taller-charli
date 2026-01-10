@@ -250,7 +250,8 @@ export default function MyVehicles() {
                         {vehicles.map((car) => (
                             <div 
                                 key={car.id} 
-                                className="group relative bg-white dark:bg-[#1a2632] rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 transition-all duration-300 hover:-translate-y-1"
+                                onClick={() => openEdit(car)}
+                                className="group relative cursor-pointer bg-white dark:bg-[#1a2632] rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 transition-all duration-300 hover:-translate-y-1"
                             >
                                 {/* Card Header */}
                                 <div className="flex justify-between items-start mb-6">
@@ -319,14 +320,14 @@ export default function MyVehicles() {
                                 {/* Actions */}
                                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                                     <button 
-                                        onClick={() => openEdit(car)}
+                                        onClick={(e) => { e.stopPropagation(); openEdit(car); }}
                                         className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-[20px]">edit_square</span>
                                         Editar
                                     </button>
                                     <button 
-                                        onClick={() => setVehicleToDelete(car)}
+                                        onClick={(e) => { e.stopPropagation(); setVehicleToDelete(car); }}
                                         className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-[20px]">delete</span>

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { partsApi, UpsertPartPayload } from '../../services/parts';
-import { Part, PartCategory } from '../../types/booking';
+import { bookingApi } from '../../services/booking';
+import { Part, PartCategory, BookingItem, BOOKING_STATUS_LABELS } from '../../types/booking';
 import Loading from '../../components/Loading';
 
 interface MyPartsProps {
@@ -9,14 +11,18 @@ interface MyPartsProps {
 }
 
 export default function MyParts({ adminClientId }: MyPartsProps) {
+    const navigate = useNavigate();
     const { user, token } = useAuth();
     const [parts, setParts] = useState<Part[]>([]);
     const [categories, setCategories] = useState<PartCategory[]>([]);
+    const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(true);
     
     // Modal & Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPart, setEditingPart] = useState<Part | null>(null);
+    const [partBookings, setPartBookings] = useState<BookingItem[]>([]);
+    const [loadingBookings, setLoadingBookings] = useState(false);
     const [partToDelete, setPartToDelete] = useState<Part | null>(null);
     
     // Form Data
@@ -39,7 +45,7 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
         if (!token) return;
         fetchData();
         fetchCategories();
-    }, [token, adminClientId]);
+    }, [token, adminClientId, query]);
 
     // Close modals on Escape key
     useEffect(() => {
@@ -53,6 +59,19 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isModalOpen, partToDelete]);
 
+    // Fetch bookings history when editing part
+    useEffect(() => {
+        if (editingPart && token) {
+            setLoadingBookings(true);
+            bookingApi.getBookingsByPart(editingPart.id, token)
+                .then(data => setPartBookings(data))
+                .catch(err => console.error("Error fetching part history", err))
+                .finally(() => setLoadingBookings(false));
+        } else {
+            setPartBookings([]);
+        }
+    }, [editingPart, token]);
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -62,18 +81,8 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                     // Viewing specific client's parts
                     data = await partsApi.listParts(adminClientId, token!);
                 } else {
-                    // Admin viewing ALL parts? The API I defined in services/parts.ts didn't have "listAllParts".
-                    // It had listParts(clientId) and listMyParts().
-                    // Maybe I should assume for now Admin uses this mainly inside AdminClients?
-                    // Or if accessed via route /dashboard/parts, maybe it fails or needs another endpoint.
-                    // For now, let's assume Admin only uses this within context or if I add "listAllParts" later.
-                    // Actually, let's try to fetch "My Parts" if no clientId provided, or maybe just empty.
-                    // But wait, the user said "create a new page". Admin probably wants to see parts too.
-                    // In `MyVehicles`, `getAllVehicles` existed. In `parts.ts` I only see `listParts(clientId)`.
-                    // I will stick to what I have: if Admin and no clientId, maybe show empty or Handle differently?
-                    // Let's assume for now this page is primarily for "My Parts" (user) or "Client Parts" (admin viewing client).
-                    // If Admin navigates to "Mis Piezas", technically they don't have parts.
-                    data = []; 
+                    // Admin viewing ALL parts (Global Inventory)
+                    data = await partsApi.getAllParts(token!, query);
                 }
             } else {
                 data = await partsApi.listMyParts(token!);
@@ -164,14 +173,17 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight leading-tight">
-                        {adminClientId ? 'Gestión de Piezas' : 'Mis Piezas'}
+                        {adminClientId ? 'Gestión de Piezas' : isAdmin ? 'Inventario Global' : 'Mis Piezas'}
                     </h1>
                     <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
                         {adminClientId 
                             ? 'Gestiona el inventario de piezas de este cliente.' 
-                            : 'Gestiona tus piezas y repuestos propios.'}
+                            : isAdmin 
+                                ? 'Visualiza y gestiona todas las piezas y repuestos de los clientes.'
+                                : 'Gestiona tus piezas y repuestos propios.'}
                     </p>
                 </div>
+                {!isAdmin && (
                 <button
                     onClick={openCreate}
                     className="group relative flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold h-12 px-8 rounded-full shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
@@ -180,7 +192,23 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                     <span className="material-symbols-outlined text-[24px]">add_circle</span>
                     <span className="text-base">Registrar Pieza</span>
                 </button>
+                )}
             </div>
+
+            {/* Filters Section (Admin only) */}
+            {isAdmin && !adminClientId && (
+                <div className="mb-10 bg-white dark:bg-[#1a2632] p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center">
+                    <div className="pl-4 pr-3 text-gray-400">
+                        <span className="material-symbols-outlined text-[24px]">search</span>
+                    </div>
+                    <input
+                        className="w-full h-12 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 border-none focus:ring-0 text-base"
+                        placeholder="Buscar por descripción, categoría o propietario..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                    />
+                </div>
+            )}
 
             {/* Main Content Grid */}
             <div className="min-h-[400px]">
@@ -194,22 +222,29 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                             <span className="material-symbols-outlined text-gray-300 dark:text-gray-600 text-[48px]">extension</span>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                            No hay piezas registradas
+                            {query ? 'No se encontraron piezas' : 'No hay piezas registradas'}
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-8">
-                            Registra piezas propias para tener un control de tu inventario personal.
+                            {query 
+                                ? 'Intenta ajustar los términos de búsqueda para encontrar lo que necesitas.'
+                                : isAdmin 
+                                    ? 'Aún no hay piezas registradas en el sistema.' 
+                                    : 'Registra piezas propias para tener un control de tu inventario personal.'}
                         </p>
+                        {!isAdmin && (
                         <button onClick={openCreate} className="text-primary font-bold hover:underline flex items-center gap-2">
                             <span className="material-symbols-outlined">add</span>
                             Agregar mi primera pieza
                         </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                         {parts.map((part) => (
                             <div 
                                 key={part.id} 
-                                className="group relative bg-white dark:bg-[#1a2632] rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 transition-all duration-300 hover:-translate-y-1"
+                                onClick={() => openEdit(part)}
+                                className="group relative cursor-pointer bg-white dark:bg-[#1a2632] rounded-3xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/50 transition-all duration-300 hover:-translate-y-1"
                             >
                                 {/* Card Header */}
                                 <div className="flex justify-between items-start mb-6">
@@ -238,16 +273,16 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                                 {/* Actions */}
                                 <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-800/50">
                                     <button 
-                                        onClick={() => openEdit(part)}
+                                        onClick={(e) => { e.stopPropagation(); openEdit(part); }}
                                         className="flex-1 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-sm transition-colors flex items-center justify-center gap-2"
                                     >
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
                                         Editar
                                     </button>
                                     <button 
-                                        onClick={() => setPartToDelete(part)}
+                                        onClick={(e) => { e.stopPropagation(); setPartToDelete(part); }}
                                         className="h-10 w-10 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 flex items-center justify-center transition-colors"
-                                        title="Eliminar vehículo"
+                                        title="Eliminar pieza"
                                     >
                                         <span className="material-symbols-outlined text-[20px]">delete</span>
                                     </button>
@@ -265,8 +300,8 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                         className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" 
                         onClick={() => setIsModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-lg bg-white dark:bg-[#1a2632] rounded-[2rem] shadow-2xl overflow-hidden animate-scale-in">
-                        <div className="px-8 py-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30">
+                    <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col bg-white dark:bg-[#1a2632] rounded-[2rem] shadow-2xl overflow-hidden animate-scale-in">
+                        <div className="flex-none px-8 py-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30">
                             <div>
                                 <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
                                     {editingPart ? 'Editar Pieza' : 'Nueva Pieza'}
@@ -283,8 +318,8 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSave}>
-                            <div className="p-8 space-y-6">
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            <form id="part-form" onSubmit={handleSave} className="space-y-6">
                                 {/* Category Select */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide ml-1">
@@ -323,24 +358,80 @@ export default function MyParts({ adminClientId }: MyPartsProps) {
                                         placeholder="Ej: Carburador Weber 40/40, Juego de Pistones Forjados..."
                                     />
                                 </div>
-                            </div>
+                            </form>
 
-                            <div className="px-8 py-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 flex gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 h-12 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all"
-                                >
-                                    {editingPart ? 'Guardar Cambios' : 'Registrar Pieza'}
-                                </button>
-                            </div>
-                        </form>
+                            {/* Booking History Section */}
+                            {editingPart && (
+                                <div className="mt-8 animate-fade-in border-t border-gray-100 dark:border-gray-800 pt-8">
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">history</span>
+                                        Historial de Uso
+                                    </h3>
+                                    
+                                    {loadingBookings ? (
+                                        <div className="flex justify-center p-4"><Loading /></div>
+                                    ) : partBookings.length === 0 ? (
+                                        <p className="text-gray-500 dark:text-gray-400 text-sm italic bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl text-center">
+                                            No hay registros de uso para esta pieza.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {partBookings.map(booking => (
+                                                <div 
+                                                    key={booking.id} 
+                                                    onClick={() => navigate(`/dashboard/repair/${booking.id}`)}
+                                                    className="cursor-pointer p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 flex justify-between items-center group hover:bg-white dark:hover:bg-gray-800 transition-colors shadow-sm"
+                                                    title="Ver detalles de la reparación"
+                                                >
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-mono font-bold text-gray-900 dark:text-white">
+                                                                {new Date(booking.scheduledAt).toLocaleDateString()}
+                                                            </span>
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold
+                                                                ${booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 
+                                                                  booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                                  'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}
+                                                            `}>
+                                                                {BOOKING_STATUS_LABELS[booking.status] || booking.status}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium truncate max-w-[200px]">
+                                                            {booking.vehicle 
+                                                                ? `${booking.vehicle.brand?.name || booking.vehicle.brandOther} ${booking.vehicle.model}`
+                                                                : 'Vehículo N/A'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs text-gray-400 block mb-1">Costo Mano de Obra</span>
+                                                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                                                            ${booking.laborCost || 0}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-none px-8 py-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1 h-12 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                form="part-form"
+                                className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all"
+                            >
+                                {editingPart ? 'Guardar Cambios' : 'Registrar Pieza'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
