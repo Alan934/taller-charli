@@ -89,5 +89,7 @@ export const bookingApi = {
     request<BookingItem>(`/bookings/${id}/details`, { method: 'PATCH', body: { details }, token }),
   updateRepairNotes: (id: number, repairNotes: string, token: string) =>
     request<BookingItem>(`/bookings/${id}/repair-notes`, { method: 'PATCH', body: { repairNotes }, token }),
+  getBookingsByVehicle: (vehicleId: number, token: string) =>
+    request<BookingItem[]>(`/bookings/vehicle/${vehicleId}`, { token }),
 };
 

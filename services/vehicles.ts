@@ -36,5 +36,9 @@ export const vehiclesApi = {
 
     deleteVehicleAsAdmin: (clientId: number, vehicleId: number, token: string) => {
         return request<{ success: boolean }>(`/users/${clientId}/vehicles/${vehicleId}`, { method: 'DELETE', token });
+    },
+
+    updateVehicleAsAdmin: (clientId: number, vehicleId: number, data: UpsertVehiclePayload, token: string) => {
+        return request<CustomerVehicle>(`/users/${clientId}/vehicles/${vehicleId}`, { token, method: 'PUT', body: data });
     }
 };

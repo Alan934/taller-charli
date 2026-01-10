@@ -54,6 +54,13 @@ export interface CustomerVehicle {
   notes?: string | null;
 }
 
+export interface Part {
+  id: number;
+  owner?: CustomerSummary;
+  category: PartCategory;
+  description: string;
+}
+
 export interface Issue {
   id: number;
   kind: 'COMMON' | 'CUSTOM';
@@ -148,6 +155,7 @@ export interface BookingItem {
   details?: string | null;
   repairNotes?: string | null;
   usedParts?: BookingUsedPart[];
+  commonIssues?: Issue[];
   vehicle?: {
     id?: number;
     type: VehicleTypeOption;

@@ -42,6 +42,14 @@ const DashboardLayout: React.FC = () => {
       </a>
 
       <a
+        onClick={() => goTo('/dashboard/parts')}
+        className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/parts') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
+      >
+        <span className={`material-symbols-outlined ${isActive('/dashboard/parts') ? 'text-primary' : 'text-[#617989] dark:text-gray-400 group-hover:text-primary'} transition-colors`}>extension</span>
+        <p className="text-sm font-medium leading-normal">{user?.role === 'ADMIN' ? 'Gestión de Piezas' : 'Mis Piezas'}</p>
+      </a>
+
+      <a
         onClick={() => goTo('/dashboard/history')}
         className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-all group ${isActive('/dashboard/history') ? 'bg-primary/10 text-primary' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-[#111518] dark:text-gray-300'}`}
       >
