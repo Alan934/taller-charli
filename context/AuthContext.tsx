@@ -30,10 +30,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authApi
       .profile(savedToken)
       .then(setUser)
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
+      .catch((error) => {
+        console.error('Error restaurando sesión:', error);
+        // Solo cerrar sesión si el token ya no existe (borrado por apiClient en 401)
+        if (!localStorage.getItem(TOKEN_KEY)) {
+          setToken(null);
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);

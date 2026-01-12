@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingApi } from '../../services/booking';
 import { BOOKING_STATUS_LABELS, BookingItem, BookingStatus } from '../../types/booking';
@@ -23,9 +23,42 @@ const getRelativeLabel = (date: Date) => {
     return target.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 };
 
+// Skeleton Component
+const HistorySkeleton = () => (
+    <div className="space-y-8">
+        {[1, 2, 3].map((group) => (
+            <div key={group} className="animate-pulse">
+                <div className="h-6 w-32 bg-gray-200 dark:bg-gray-800 rounded mb-4 ml-4" />
+                <div className="space-y-4">
+                    {[1, 2].map((item) => (
+                        <div key={item} className="bg-white dark:bg-[#1a2632] rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div className="hidden md:flex flex-col items-center gap-2 min-w-[80px]">
+                                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                                </div>
+                                <div className="flex-1 space-y-3">
+                                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-4 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+                                </div>
+                                <div className="flex items-center justify-between md:flex-col md:items-end gap-3 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100 dark:border-gray-800">
+                                    <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+);
+
 const History: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { token, user } = useAuth();
     
     // Data state
@@ -33,13 +66,38 @@ const History: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Filter state
-    const [query, setQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | BookingStatus>('ALL');
-    const [assetFilter, setAssetFilter] = useState<'ALL' | AssetType>('ALL');
+    // Initial load tracking to avoid double fetch if unnecessary (though useEffect handles deps)
+    
+    // Filter persistence
+    const query = searchParams.get('q') || '';
+    const statusFilter = (searchParams.get('status') as BookingStatus | 'ALL') || 'ALL';
+    const assetFilter = (searchParams.get('type') as AssetType | 'ALL') || 'ALL';
 
-    // Display limit state (Map to store expanded state for each group)
+    const setQuery = (val: string) => {
+        setSearchParams(prev => {
+            if (val) prev.set('q', val); else prev.delete('q');
+            return prev;
+        }, { replace: true });
+    };
+
+    const setStatusFilter = (val: BookingStatus | 'ALL') => {
+        setSearchParams(prev => {
+            if (val !== 'ALL') prev.set('status', val); else prev.delete('status');
+            return prev;
+        }, { replace: true });
+    };
+
+    const setAssetFilter = (val: AssetType | 'ALL') => {
+        setSearchParams(prev => {
+            if (val !== 'ALL') prev.set('type', val); else prev.delete('type');
+            return prev;
+        }, { replace: true });
+    };
+
+    // UI states
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const [openStatusMenuId, setOpenStatusMenuId] = useState<number | null>(null);
+    const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
 
     // Load Data
     useEffect(() => {
@@ -57,7 +115,11 @@ const History: React.FC = () => {
                 const state = location.state as { highlightId?: number } | null;
                 if (state?.highlightId) {
                     const found = sorted.find(b => b.id === state.highlightId);
-                    if (found) setQuery(found.code);
+                    if (found && !query) {
+                         // Only set query if it's not already set in URL to avoid conflict, 
+                         // or override if that's the intention of the notification click
+                         setQuery(found.code);
+                    }
                 }
             })
             .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar el historial'))
@@ -117,6 +179,37 @@ const History: React.FC = () => {
             [groupLabel]: !prev[groupLabel]
         }));
     };
+
+    const handleStatusClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        setOpenStatusMenuId(prev => (prev === id ? null : id));
+    };
+
+    const handleStatusChange = async (e: React.MouseEvent, id: number, newStatus: BookingStatus) => {
+        e.stopPropagation();
+        setOpenStatusMenuId(null);
+        if (!token) return;
+
+        setUpdatingStatusId(id);
+        try {
+            const updated = await bookingApi.updateStatus(id, newStatus, token);
+            setBookings(prev => prev.map(b => (b.id === id ? { ...b, status: updated.status } : b)));
+        } catch (err) {
+            console.error(err);
+            alert('No se pudo actualizar el estado.'); // Simple alert for now, can be improved
+        } finally {
+            setUpdatingStatusId(null);
+        }
+    };
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const closeMenu = () => setOpenStatusMenuId(null);
+        if (openStatusMenuId) {
+            window.addEventListener('click', closeMenu);
+        }
+        return () => window.removeEventListener('click', closeMenu);
+    }, [openStatusMenuId]);
 
     return (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 font-sans pb-24">
@@ -189,7 +282,7 @@ const History: React.FC = () => {
 
             {/* Content List */}
             {loading ? (
-                <div className="py-20 flex justify-center"><Loading /></div>
+                <HistorySkeleton />
             ) : error ? (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-500 p-6 rounded-2xl flex items-center gap-3">
                     <span className="material-symbols-outlined">error</span>
@@ -218,12 +311,12 @@ const History: React.FC = () => {
                                             <div
                                                 key={item.id}
                                                 onClick={() => navigate(`/dashboard/repair/${item.id}`)}
-                                                className="group relative bg-white dark:bg-[#1a2632] rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden"
+                                                className={`group relative bg-white dark:bg-[#1a2632] rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-black/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer ${openStatusMenuId === item.id ? 'z-30' : 'z-0'}`}
                                             >
                                                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                                                     
                                                     {/* Status Indicator Stripe */}
-                                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl ${
                                                         item.status === 'DONE' ? 'bg-green-500' :
                                                         item.status === 'IN_PROGRESS' ? 'bg-blue-500' :
                                                         item.status === 'CANCELED' ? 'bg-red-500' :
@@ -272,19 +365,65 @@ const History: React.FC = () => {
                                                         )}
                                                     </div>
 
-                                                    {/* Status Badge & Action */}
-                                                    <div className="flex items-center justify-between md:flex-col md:items-end gap-3 shrink-0 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-50 dark:border-gray-800">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                                                             item.status === 'DONE' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' :
-                                                             item.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800' :
-                                                             item.status === 'CANCELED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' :
-                                                             'bg-gray-100 text-gray-700 border-gray-200'
-                                                        }`}>
-                                                            {BOOKING_STATUS_LABELS[item.status]}
-                                                        </span>
+                                                    {/* Status Badge & Actions */}
+                                                    <div className="flex items-center justify-between md:flex-col md:items-end gap-3 shrink-0 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-50 dark:border-gray-800 relative z-20">
+                                                        
+                                                        {/* Status Dropdown Trigger */}
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => handleStatusClick(e, item.id)}
+                                                                disabled={updatingStatusId === item.id}
+                                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all hover:brightness-95 ${
+                                                                    item.status === 'DONE' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' :
+                                                                    item.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800' :
+                                                                    item.status === 'CANCELED' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' :
+                                                                    'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                                                                }`}
+                                                            >
+                                                                {updatingStatusId === item.id ? (
+                                                                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <>
+                                                                       {BOOKING_STATUS_LABELS[item.status]}
+                                                                       <span className="material-symbols-outlined text-[14px]">arrow_drop_down</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+
+                                                            {/* Dropdown Menu */}
+                                                            {openStatusMenuId === item.id && (
+                                                                <div 
+                                                                    className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-[#1a2632] rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden z-20 animate-scale-in origin-top-right"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    {Object.entries(BOOKING_STATUS_LABELS).map(([key, label]) => (
+                                                                        <button
+                                                                            key={key}
+                                                                            onClick={(e) => handleStatusChange(e, item.id, key as BookingStatus)}
+                                                                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center gap-2 transition-colors ${
+                                                                                key === item.status 
+                                                                                    ? 'bg-primary/5 text-primary' 
+                                                                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                                            }`}
+                                                                        >
+                                                                            <span className={`w-2 h-2 rounded-full ${
+                                                                                key === 'DONE' ? 'bg-green-500' :
+                                                                                key === 'IN_PROGRESS' ? 'bg-blue-500' :
+                                                                                key === 'CANCELED' ? 'bg-red-500' :
+                                                                                'bg-gray-300'
+                                                                            }`} />
+                                                                            {label}
+                                                                            {key === item.status && (
+                                                                                <span className="material-symbols-outlined text-[14px] ml-auto">check</span>
+                                                                            )}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         
                                                         <span className="flex items-center gap-1 text-primary text-sm font-bold group-hover:underline">
-                                                            Ver detalle
+                                                            Mas detalles
                                                             <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                                                         </span>
                                                     </div>
